@@ -1,5 +1,5 @@
-import { Player } from "./Player";
-import type { Question } from "./Question";
+import  type { Player } from "./Player.js";
+import type { Question } from "./Question.js";
 
 export interface Game {
   code: string;

@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 
-import { createGame, joinGame, getGame, startGame, getCurrentQuestion,   submitAnswer, nextQuestion, getLeaderboard } from "./gameManager";
+import { createGame, joinGame, getGame, startGame, getCurrentQuestion,   submitAnswer, nextQuestion, getLeaderboard } from "./gameManager.js";
 
 
 const app = express();

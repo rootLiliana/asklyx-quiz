@@ -1,4 +1,5 @@
-import { Game } from "./types/Game";
+import type { Game } from "./types/Game.js";
+import type { Player } from "./types/Player.js";
 
 const games = new Map<string, Game>();
 export function createGame() {
@@ -161,8 +162,8 @@ export function submitAnswer(
   }
 
   const player = game.players.find(
-    p => p.id === playerId
-  );
+  (p: Player) => p.id === playerId
+);
 
   if (!player) {
     return null;
@@ -211,9 +212,10 @@ export function getLeaderboard(
     return null;
   }
 
-  return [...game.players].sort(
-    (a, b) => b.score - a.score
-  );
+ return [...game.players].sort(
+  (a: Player, b: Player) =>
+    b.score - a.score
+);
 }
 
 
