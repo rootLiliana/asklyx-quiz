@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Game } from "../types/Game";
 import type { Player } from "../types/Player";
+import { API } from "../config/api";
 
 export default function Host() {
   const [game, setGame] =
@@ -27,7 +28,7 @@ export default function Host() {
     if (!game) return;
 
     const response = await fetch(
-      `http://localhost:3001/games/${game.code}/start`,
+       `${API}/games/${game.code}/start`,
       {
         method: "POST",
       }
@@ -43,7 +44,7 @@ export default function Host() {
     if (!game) return;
 
     const response = await fetch(
-      `http://localhost:3001/games/${game.code}/next`,
+       `${API}/games/${game.code}/next`,
       {
         method: "POST",
       }
@@ -60,7 +61,7 @@ export default function Host() {
       if (!game) return;
 
       const response = await fetch(
-        `http://localhost:3001/games/${game.code}/leaderboard`
+         `${API}/games/${game.code}/leaderboard`
       );
 
       const data: Player[] =
@@ -76,7 +77,7 @@ export default function Host() {
       async () => {
         const response =
           await fetch(
-            `http://localhost:3001/games/${game.code}`
+             `${API}/games/${game.code}`
           );
 
         const updatedGame: Game =

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { Question } from "../types/Question";
 import type { Player } from "../types/Player";
+import { API } from "../config/api";
 
 
 export default function Quiz() {
@@ -33,7 +34,7 @@ export default function Quiz() {
     if (!code) return;
 
     const response = await fetch(
-      `http://localhost:3001/games/${code}/question`
+       `${API}/games/${code}/question`
     );
 
     const data = await response.json();
@@ -59,7 +60,7 @@ export default function Quiz() {
 
   const loadLeaderboard = async () => {
     const response = await fetch(
-      `http://localhost:3001/games/${code}/leaderboard`
+       `${API}/games/${code}/leaderboard`
     );
 
     const data: Player[] =
@@ -114,7 +115,7 @@ export default function Quiz() {
     if (!playerId) return;
 
     const response = await fetch(
-      `http://localhost:3001/games/${code}/answer`,
+       `${API}/games/${code}/answer`,
       {
         method: "POST",
         headers: {

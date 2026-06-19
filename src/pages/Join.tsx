@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Game } from "../types/Game";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { API } from "../config/api";
 
 export default function Join() {
   const [name, setName] = useState("");
@@ -10,7 +11,7 @@ export default function Join() {
 
   const joinGame = async () => {
     const response = await fetch(
-      `http://localhost:3001/games/${code}/join`,
+      `${API}/games/${code}/join`,
       {
         method: "POST",
         headers: {
