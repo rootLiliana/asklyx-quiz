@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { Question } from "../types/Question";
-import type { Game } from "../types/Game";
 import type { Player } from "../types/Player";
-import Confetti from "react-confetti";
+
 
 export default function Quiz() {
   const [question, setQuestion] =
