@@ -12,7 +12,7 @@ export default function Host() {
 
   const createGame = async () => {
     const response = await fetch(
-      "http://localhost:3001/games",
+       `${API}/games`,
       {
         method: "POST",
       }
