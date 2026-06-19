@@ -222,164 +222,163 @@ export default function Quiz() {
         recycle={true}
         numberOfPieces={250}
       />
+<div
+  className="
+    flex
+    flex-col
+    md:flex-row
 
-      <div
-        className="
-          min-h-screen
-          bg-gradient-to-br
-          from-purple-900
-          via-indigo-900
-          to-black
-          flex
-          items-center
-          justify-center
-          p-6
-        "
-      >
-        <div
-          className="
-          bg-white/10
-          backdrop-blur-xl
-          rounded-3xl
-          p-10
-          shadow-2xl
+    items-center
+    md:items-end
 
-          w-full
-          max-w-4xl
-        "
-        >
-          <h1
-            className="
-            text-6xl
-            text-center
-            mb-12
-          "
-          >
-            🏆
-          </h1>
+    justify-center
+    gap-6
+  "
+>
 
-          <h2
-            className="
-            text-white
-            text-center
-            text-5xl
-            font-bold
-            mb-16
-          "
-          >
-         🏆 Campeonas Asklyx 🏆
-          </h2>
+  {/* Segundo */}
+  <div
+    className="
+      text-center
+    "
+  >
+    <h2 className="text-5xl">
+      🥈
+    </h2>
 
-          <div
-            className="
-              hidden
-              md:flex
+    <p
+      className="
+        text-white
+        text-2xl
+      "
+    >
+      {leaderboard[1]?.name}
+    </p>
 
-              items-end
-              justify-center
-              gap-6
-            "
-          >
-            {/* Segundo */}
-            <div
-              className="
-              text-center
-            "
-            >
-              <h2 className="text-5xl">
-                🥈
-              </h2>
+    <div
+      className="
+        h-40
+        w-32
 
-              <p className="text-white text-2xl">
-                {leaderboard[1]?.name}
-              </p>
+        bg-slate-400
+        rounded-t-xl
 
-              <div
-                className="
-                h-40
-                w-32
-                bg-slate-400
-                rounded-t-xl
+        flex
+        items-center
+        justify-center
 
-                flex
-                items-center
-                justify-center
+        text-white
+        font-bold
+      "
+    >
+      {leaderboard[1]?.score}
+    </div>
+  </div>
 
-                text-white
-                font-bold
-              "
-              >
-                {leaderboard[1]?.score}
-              </div>
-            </div>
+  {/* Primero */}
+  <div
+    className="
+      text-center
+    "
+  >
+    <h2 className="text-6xl">
+      👑
+    </h2>
 
-            {/* Primero */}
-            <div
-              className="
-              text-center
-            "
-            >
-              <h2 className="text-6xl">
-                👑
-              </h2>
+    <h2 className="text-6xl">
+      🥇
+    </h2>
 
-              <h2 className="text-6xl">
-                🥇
-              </h2>
+    <motion.p
+      animate={{
+        scale: [1, 1.1, 1],
+      }}
+      transition={{
+        repeat: Infinity,
+        duration: 1.5,
+      }}
+      className="
+        text-white
+        text-3xl
+        font-bold
+      "
+    >
+      {leaderboard[0]?.name}
+    </motion.p>
 
-              <motion.p
-                animate={{
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1.5,
-                }}
-                className="
-                  text-white
-                  text-3xl
-                  font-bold
-                "
-              >
-                👑 {leaderboard[0]?.name}
-              </motion.p>
+    <motion.div
+      animate={{
+        y: [0, -10, 0],
+        boxShadow: [
+          "0 0 10px #facc15",
+          "0 0 40px #facc15",
+          "0 0 10px #facc15",
+        ],
+      }}
+      transition={{
+        repeat: Infinity,
+        duration: 2,
+      }}
+      className="
+        h-56
+        w-36
 
-             <motion.div
-                  animate={{
-                    y: [0, -10, 0],
-                    boxShadow: [
-                      "0 0 10px #facc15",
-                      "0 0 40px #facc15",
-                      "0 0 10px #facc15",
-                    ],
-                  }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 2,
-                  }}
-                  className="
-                    h-56
-                    w-36
+        bg-yellow-500
+        rounded-t-xl
 
-                    bg-yellow-500
-                    rounded-t-xl
+        flex
+        items-center
+        justify-center
 
-                    flex
-                    items-center
-                    justify-center
+        text-white
+        font-bold
+        text-2xl
+      "
+    >
+      {leaderboard[0]?.score}
+    </motion.div>
+  </div>
 
-                    text-white
-                    font-bold
-                    text-2xl
-                  "
-                >
-                  {leaderboard[0]?.score}
-                </motion.div>
-             
-            </div>
-          </div>
-        </div>
-     </div>
+  {/* Tercero */}
+  <div
+    className="
+      text-center
+    "
+  >
+    <h2 className="text-5xl">
+      🥉
+    </h2>
+
+    <p
+      className="
+        text-white
+        text-2xl
+      "
+    >
+      {leaderboard[2]?.name}
+    </p>
+
+    <div
+      className="
+        h-28
+        w-32
+
+        bg-orange-700
+        rounded-t-xl
+
+        flex
+        items-center
+        justify-center
+
+        text-white
+        font-bold
+      "
+    >
+      {leaderboard[2]?.score}
+    </div>
+  </div>
+
+</div>
     </>
   );
   }
