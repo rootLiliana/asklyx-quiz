@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type { Question } from "../types/Question";
 import type { Player } from "../types/Player";
 import { API } from "../config/api";
+import Confetti from "react-confetti";
 
 
 export default function Quiz() {
@@ -70,6 +71,12 @@ export default function Quiz() {
     setLeaderboard(data);
   };
 
+  const [windowSize, setWindowSize] =
+  useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
   useEffect(() => {
     loadQuestion();
 
@@ -103,6 +110,25 @@ export default function Quiz() {
       clearTimeout(timer);
   }, [timeLeft, answered]);
 
+  useEffect(() => {
+  const handleResize = () => {
+    setWindowSize({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+  };
+
+  window.addEventListener(
+    "resize",
+    handleResize
+  );
+
+  return () =>
+    window.removeEventListener(
+      "resize",
+      handleResize
+    );
+}, []);
 
   const submitAnswer = async (
     answer: number
@@ -188,24 +214,27 @@ export default function Quiz() {
 
 
   if (finished) {
-
-    return (
+  return (
+    <>
+      <Confetti
+        width={windowSize.width}
+        height={windowSize.height}
+        recycle={true}
+        numberOfPieces={250}
+      />
 
       <div
-
-
         className="
-        min-h-screen
-        bg-gradient-to-br
-        from-purple-900
-        via-indigo-900
-        to-black
-
-        flex
-        items-center
-        justify-center
-        p-6
-      "
+          min-h-screen
+          bg-gradient-to-br
+          from-purple-900
+          via-indigo-900
+          to-black
+          flex
+          items-center
+          justify-center
+          p-6
+        "
       >
         <div
           className="
@@ -238,16 +267,18 @@ export default function Quiz() {
             mb-16
           "
           >
-            Ranking Final
+         🏆 Campeonas Asklyx 🏆
           </h2>
 
           <div
             className="
-            flex
-            items-end
-            justify-center
-            gap-6
-          "
+              hidden
+              md:flex
+
+              items-end
+              justify-center
+              gap-6
+            "
           >
             {/* Segundo */}
             <div
@@ -296,68 +327,61 @@ export default function Quiz() {
                 🥇
               </h2>
 
-              <p className="text-white text-3xl">
-                {leaderboard[0]?.name}
-              </p>
-
-              <div
+              <motion.p
+                animate={{
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 1.5,
+                }}
                 className="
-                h-56
-                w-36
-
-                bg-yellow-500
-                rounded-t-xl
-
-                flex
-                items-center
-                justify-center
-
-                text-white
-                font-bold
-                text-xl
-              "
+                  text-white
+                  text-3xl
+                  font-bold
+                "
               >
-                {leaderboard[0]?.score}
-              </div>
-            </div>
+                👑 {leaderboard[0]?.name}
+              </motion.p>
 
-            {/* Tercero */}
-            <div
-              className="
-              text-center
-            "
-            >
-              <h2 className="text-5xl">
-                🥉
-              </h2>
+             <motion.div
+                  animate={{
+                    y: [0, -10, 0],
+                    boxShadow: [
+                      "0 0 10px #facc15",
+                      "0 0 40px #facc15",
+                      "0 0 10px #facc15",
+                    ],
+                  }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 2,
+                  }}
+                  className="
+                    h-56
+                    w-36
 
-              <p className="text-white text-2xl">
-                {leaderboard[2]?.name}
-              </p>
+                    bg-yellow-500
+                    rounded-t-xl
 
-              <div
-                className="
-                h-28
-                w-32
+                    flex
+                    items-center
+                    justify-center
 
-                bg-orange-700
-                rounded-t-xl
-
-                flex
-                items-center
-                justify-center
-
-                text-white
-                font-bold
-              "
-              >
-                {leaderboard[2]?.score}
-              </div>
+                    text-white
+                    font-bold
+                    text-2xl
+                  "
+                >
+                  {leaderboard[0]?.score}
+                </motion.div>
+             
             </div>
           </div>
         </div>
-      </div>
-    );
+     </div>
+    </>
+  );
   }
 
   if (!question) {
