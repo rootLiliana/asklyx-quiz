@@ -2,6 +2,8 @@ import type { Game } from "./types/Game.js";
 import type { Player } from "./types/Player.js";
 
 const games = new Map<string, Game>();
+const QUESTION_DURATION_SECONDS = 15;
+
 export function createGame() {
 
 const questions = [
@@ -81,6 +83,7 @@ const questions = [
   players: [],
   questions,
   currentQuestion: -1,
+  questionDurationSeconds: QUESTION_DURATION_SECONDS,
 };
 
   games.set(code, game);
@@ -150,9 +153,17 @@ export function getCurrentQuestion(
     };
   }
 
-  return game.questions[
-    game.currentQuestion
-  ];
+  const question =
+    game.questions[game.currentQuestion];
+
+  if (!question) {
+    return null;
+  }
+
+  return {
+    ...question,
+    durationSeconds: game.questionDurationSeconds,
+  };
 }
 
 export function submitAnswer(
@@ -191,8 +202,16 @@ export function submitAnswer(
     answer === question.correctAnswer;
 
   if (isCorrect) {
-    console.log("timeLeft:", timeLeft);
-    player.score += timeLeft * 100;
+    const safeTimeLeft = Math.max(
+      0,
+      Math.min(
+        Math.ceil(timeLeft),
+        game.questionDurationSeconds
+      )
+    );
+
+    console.log("timeLeft:", safeTimeLeft);
+    player.score += safeTimeLeft * 100;
   }
 
   return {

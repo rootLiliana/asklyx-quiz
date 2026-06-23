@@ -14,11 +14,6 @@ app.listen(PORT, () => {
   );
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
-});
-
-
 app.use(cors());
 app.use(express.json());
 
@@ -147,5 +142,4 @@ app.get(
     res.json(leaderboard);
   }
 );
-
 

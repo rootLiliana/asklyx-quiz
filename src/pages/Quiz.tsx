@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "framer-motion";
 import type { Question } from "../types/Question";
 import type { Player } from "../types/Player";
 import { API } from "../config/api";
 import Confetti from "react-confetti";
 
+const QUESTION_DURATION_SECONDS = 15;
 
 export default function Quiz() {
   const [question, setQuestion] =
@@ -20,7 +25,7 @@ export default function Quiz() {
     useState("");
 
   const [timeLeft, setTimeLeft] =
-    useState(10);
+    useState(QUESTION_DURATION_SECONDS);
 
   const [answered, setAnswered] =
     useState(false);
@@ -30,6 +35,9 @@ export default function Quiz() {
 
   const code =
     localStorage.getItem("gameCode");
+
+  const currentQuestionId =
+    useRef<string | null>(null);
 
   const loadQuestion = async () => {
     if (!code) return;
@@ -53,9 +61,22 @@ export default function Quiz() {
       return;
     }
 
+    const durationSeconds =
+      data.durationSeconds ??
+      QUESTION_DURATION_SECONDS;
+
+    if (
+      currentQuestionId.current !==
+      data.id
+    ) {
+      currentQuestionId.current = data.id;
+      setTimeLeft(durationSeconds);
+      setAnswered(false);
+      setResult("");
+    }
+
     setWaiting(false);
     setFinished(false);
-
     setQuestion(data);
   };
 
@@ -90,20 +111,14 @@ export default function Quiz() {
   }, []);
 
   useEffect(() => {
-    if (!question) return;
-
-    setTimeLeft(10);
-    setAnswered(false);
-    setResult("");
-  }, [question?.id]);
-
-  useEffect(() => {
     if (answered) return;
 
     if (timeLeft <= 0) return;
 
     const timer = setTimeout(() => {
-      setTimeLeft(prev => prev - 1);
+      setTimeLeft(prev =>
+        Math.max(0, prev - 1)
+      );
     }, 1000);
 
     return () =>
@@ -467,7 +482,7 @@ if (finished) {
                 }}
                 disabled={
                   answered ||
-                  timeLeft === 0
+                  timeLeft <= 0
                 }
                 onClick={() =>
                   submitAnswer(index)
