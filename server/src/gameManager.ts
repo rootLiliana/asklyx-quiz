@@ -4,61 +4,61 @@ import type { Player } from "./types/Player.js";
 const games = new Map<string, Game>();
 export function createGame() {
 
-  const questions = [
+ const questions = [
 {
 "id": "1",
-"text": "¿Qué método HTTP se utiliza comúnmente para obtener datos de una API en Python?",
+"text": "¿Qué significa API?",
 "options": [
-"POST",
-"GET",
-"PUT",
-"DELETE"
+"Advanced Programming Interface",
+"Application Programming Interface",
+"Application Processing Interface",
+"Automated Programming Interface"
 ],
 "correctAnswer": 1
 },
 {
 "id": "2",
-"text": "En Python para interactuar con bases de datos MySQL y PostgreSQL, ¿qué biblioteca se utiliza para PostgreSQL?",
+"text": "¿Cuál es el propósito principal de una API?",
 "options": [
-"PyMySQL",
-"MySQLdb",
-"SQLite3",
-"psycopg2"
+"Ejecutar código más rápido",
+"Permitir la comunicación entre aplicaciones",
+"Crear interfaces gráficas",
+"Almacenar datos"
+],
+"correctAnswer": 1
+},
+{
+"id": "3",
+"text": "¿Qué código HTTP indica que una solicitud fue exitosa?",
+"options": [
+"404",
+"500",
+"403",
+"200"
 ],
 "correctAnswer": 3
 },
 {
-"id": "3",
-"text": "¿Qué cursor se utiliza para ejecutar una consulta SQL en una base de datos MySQL?",
-"options": [
-"cursor.execute()",
-"cursor.query()",
-"cursor.run()",
-"cursor.commit()"
-],
-"correctAnswer": 0
-},
-{
 "id": "4",
-"text": "¿En MongoDB qué método se utiliza para insertar un documento en una colección?",
+"text": "¿Cuál de las siguientes opciones es una base de datos NoSQL?",
 "options": [
-"insert_one()",
-"add_one()",
-"insert_document()",
-"add_document()"
+"MySQL",
+"PostgreSQL",
+"SQLite",
+"MongoDB"
 ],
-"correctAnswer": 0
+"correctAnswer": 3
 },
 {
 "id": "5",
-"text": "¿Cuál es un motor de base de datos que se utiliza para interactuar con MongoDB desde Python?",
+"text": "¿Qué comando SQL se utiliza para recuperar datos de una base de datos?",
 "options": [
-"SQLAlchemy",
-"PyMongo",
-"DjangoORM",
-"PySQLite"
+"INSERT",
+"UPDATE",
+"SELECT",
+"DELETE"
 ],
-"correctAnswer": 1
+"correctAnswer": 2
 }
 ];
 
