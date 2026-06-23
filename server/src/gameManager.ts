@@ -4,9 +4,20 @@ import type { Player } from "./types/Player.js";
 const games = new Map<string, Game>();
 export function createGame() {
 
- const questions = [
+const questions = [
 {
 "id": "1",
+"text": "¿Qué método HTTP se utiliza comúnmente para obtener datos de una API en Python?",
+"options": [
+"POST",
+"GET",
+"PUT",
+"DELETE"
+],
+"correctAnswer": 1
+},
+{
+"id": "2",
 "text": "¿Qué significa API?",
 "options": [
 "Advanced Programming Interface",
@@ -17,45 +28,45 @@ export function createGame() {
 "correctAnswer": 1
 },
 {
-"id": "2",
-"text": "¿Cuál es el propósito principal de una API?",
-"options": [
-"Ejecutar código más rápido",
-"Permitir la comunicación entre aplicaciones",
-"Crear interfaces gráficas",
-"Almacenar datos"
-],
-"correctAnswer": 1
-},
-{
 "id": "3",
-"text": "¿Qué código HTTP indica que una solicitud fue exitosa?",
+"text": "En Python para interactuar con bases de datos MySQL y PostgreSQL, ¿qué biblioteca se utiliza para PostgreSQL?",
 "options": [
-"404",
-"500",
-"403",
-"200"
+"PyMySQL",
+"MySQLdb",
+"SQLite3",
+"psycopg2"
 ],
 "correctAnswer": 3
 },
 {
 "id": "4",
-"text": "¿Cuál de las siguientes opciones es una base de datos NoSQL?",
+"text": "¿Qué cursor se utiliza para ejecutar una consulta SQL en una base de datos MySQL?",
 "options": [
-"MySQL",
-"PostgreSQL",
-"SQLite",
-"MongoDB"
+"cursor.execute()",
+"cursor.query()",
+"cursor.run()",
+"cursor.commit()"
 ],
-"correctAnswer": 3
+"correctAnswer": 0
 },
 {
 "id": "5",
-"text": "¿Qué comando SQL se utiliza para recuperar datos de una base de datos?",
+"text": "¿En MongoDB qué método se utiliza para insertar un documento en una colección?",
 "options": [
-"INSERT",
-"UPDATE",
-"SELECT",
+"insert_one()",
+"add_one()",
+"insert_document()",
+"add_document()"
+],
+"correctAnswer": 0
+},
+{
+"id": "6",
+"text": "¿Cuál de los siguientes NO es un método HTTP?",
+"options": [
+"GET",
+"POST",
+"FETCH",
 "DELETE"
 ],
 "correctAnswer": 2
