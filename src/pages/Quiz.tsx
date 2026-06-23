@@ -238,7 +238,7 @@ if (finished) {
             <div className="flex flex-col items-center text-center order-2 w-full md:w-auto">
               <h2 className="text-4xl md:text-5xl mb-2">🥈</h2>
               <p className="text-white text-xl md:text-2xl mb-2 font-semibold">
-                {leaderboard[1]?.name || "Anita"}
+                {leaderboard[1]?.name}
               </p>
               {/* En móvil se oculta el bloque alto y se muestra una etiqueta compacta, en PC vuelve el bloque */}
               <div className="hidden md:flex h-40 w-32 bg-slate-400 rounded-t-xl items-center justify-center text-white font-bold text-xl">
@@ -258,7 +258,7 @@ if (finished) {
                 transition={{ repeat: Infinity, duration: 1.5 }}
                 className="text-yellow-400 text-2xl md:text-3xl font-black mb-3 tracking-wide"
               >
-                {leaderboard[0]?.name || "Lili"}
+                {leaderboard[0]?.name }
               </motion.p>
               
               {/* Bloque para PC */}
@@ -287,7 +287,7 @@ if (finished) {
             <div className="flex flex-col items-center text-center order-3 w-full md:w-auto">
               <h2 className="text-4xl md:text-5xl mb-2">🥉</h2>
               <p className="text-white text-xl md:text-2xl mb-2">
-                {leaderboard[2]?.name || "Marco"}
+                {leaderboard[2]?.name}
               </p>
               {/* Bloque para PC */}
               <div className="hidden md:flex h-28 w-32 bg-orange-700 rounded-t-xl items-center justify-center text-white font-bold text-lg">
