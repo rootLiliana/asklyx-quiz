@@ -2,38 +2,139 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
+  type ChangeEvent,
 } from "react";
 import type { Game } from "../types/Game";
-import type { Player } from "../types/Player";
+import type { Question } from "../types/Question";
 import { API } from "../config/api";
 
 const QUESTION_DURATION_SECONDS = 15;
+const EMPTY_QUESTION: Question = {
+  id: "",
+  text: "",
+  options: ["", "", "", ""],
+  correctAnswer: 0,
+};
 
 export default function Host() {
   const [game, setGame] =
     useState<Game | null>(null);
 
-  const [leaderboard, setLeaderboard] =
-    useState<Player[]>([]);
-
   const [timeLeft, setTimeLeft] =
     useState(QUESTION_DURATION_SECONDS);
 
+  const [hostToken, setHostToken] =
+    useState(
+      () =>
+        localStorage.getItem("hostToken") ??
+        ""
+    );
+
+  const [username, setUsername] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [loginError, setLoginError] =
+    useState("");
+
+  const [configOpen, setConfigOpen] =
+    useState(false);
+
+  const [questionsDraft, setQuestionsDraft] =
+    useState<Question[]>([]);
+
+  const [configMessage, setConfigMessage] =
+    useState("");
+
   const currentQuestionIndex =
     useRef<number | null>(null);
+
+  const authHeaders = {
+    Authorization: `Bearer ${hostToken}`,
+  };
+
+  const logoutHost = useCallback(() => {
+    localStorage.removeItem("hostToken");
+    setHostToken("");
+    setGame(null);
+  }, []);
+
+  const applyGameUpdate = useCallback(
+    (updatedGame: Game) => {
+      if (
+        currentQuestionIndex.current !==
+        updatedGame.currentQuestion
+      ) {
+        currentQuestionIndex.current =
+          updatedGame.currentQuestion;
+
+        setTimeLeft(
+          updatedGame.questionDurationSeconds ??
+            QUESTION_DURATION_SECONDS
+        );
+      }
+
+      setGame(updatedGame);
+    },
+    []
+  );
+
+  const loginHost = async () => {
+    setLoginError("");
+
+    const response = await fetch(
+      `${API}/host/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      setLoginError(
+        "Usuario o contraseña incorrectos."
+      );
+      return;
+    }
+
+    const data: { token: string } =
+      await response.json();
+
+    localStorage.setItem(
+      "hostToken",
+      data.token
+    );
+    setHostToken(data.token);
+    setPassword("");
+  };
 
   const createGame = async () => {
     const response = await fetch(
        `${API}/games`,
       {
         method: "POST",
+        headers: authHeaders,
       }
     );
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
 
     const createdGame =
       await response.json();
 
-    setGame(createdGame);
+    applyGameUpdate(createdGame);
   };
 
   const startGame = async () => {
@@ -43,13 +144,19 @@ export default function Host() {
        `${API}/games/${game.code}/start`,
       {
         method: "POST",
+        headers: authHeaders,
       }
     );
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
 
     const updatedGame: Game =
       await response.json();
 
-    setGame(updatedGame);
+    applyGameUpdate(updatedGame);
   };
 
   const nextQuestion = async () => {
@@ -59,89 +166,219 @@ export default function Host() {
        `${API}/games/${game.code}/next`,
       {
         method: "POST",
+        headers: authHeaders,
       }
     );
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
 
     const updatedGame: Game =
       await response.json();
 
-    setGame(updatedGame);
+    applyGameUpdate(updatedGame);
   };
 
-  const loadLeaderboard =
-    async () => {
-      if (!game) return;
+  const loadQuestions = async () => {
+    setConfigMessage("");
 
-      const response = await fetch(
-         `${API}/games/${game.code}/leaderboard`
+    const response = await fetch(
+      `${API}/host/questions`,
+      {
+        headers: authHeaders,
+      }
+    );
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
+
+    const data: Question[] =
+      await response.json();
+
+    setQuestionsDraft(data);
+  };
+
+  const openQuizConfig = async () => {
+    setConfigOpen(true);
+    await loadQuestions();
+  };
+
+  const saveQuestions = async () => {
+    setConfigMessage("");
+
+    const response = await fetch(
+      `${API}/host/questions`,
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          questions: questionsDraft,
+        }),
+      }
+    );
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
+
+    if (!response.ok) {
+      setConfigMessage(
+        "Revisa que cada pregunta tenga texto, al menos dos opciones y una respuesta correcta."
       );
+      return;
+    }
 
-      const data: Player[] =
-        await response.json();
+    const savedQuestions: Question[] =
+      await response.json();
 
-      setLeaderboard(data);
-    };
+    setQuestionsDraft(savedQuestions);
+    setConfigMessage(
+      "Quiz guardado. El próximo juego usará estas preguntas."
+    );
+  };
+
+  const addQuestion = () => {
+    setQuestionsDraft((questions) => [
+      ...questions,
+      {
+        ...EMPTY_QUESTION,
+        id: crypto.randomUUID(),
+        options: [...EMPTY_QUESTION.options],
+      },
+    ]);
+  };
+
+  const removeQuestion = (index: number) => {
+    setQuestionsDraft((questions) =>
+      questions.filter(
+        (_, questionIndex) =>
+          questionIndex !== index
+      )
+    );
+  };
+
+  const updateQuestionText = (
+    index: number,
+    event: ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const { value } = event.target;
+
+    setQuestionsDraft((questions) =>
+      questions.map((question, questionIndex) =>
+        questionIndex === index
+          ? {
+              ...question,
+              text: value,
+            }
+          : question
+      )
+    );
+  };
+
+  const updateOption = (
+    questionIndex: number,
+    optionIndex: number,
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const { value } = event.target;
+
+    setQuestionsDraft((questions) =>
+      questions.map((question, index) => {
+        if (index !== questionIndex) {
+          return question;
+        }
+
+        const options =
+          question.options.map(
+            (option, currentOptionIndex) =>
+              currentOptionIndex ===
+              optionIndex
+                ? value
+                : option
+          );
+
+        return {
+          ...question,
+          options,
+        };
+      })
+    );
+  };
+
+  const updateCorrectAnswer = (
+    questionIndex: number,
+    correctAnswer: number
+  ) => {
+    setQuestionsDraft((questions) =>
+      questions.map((question, index) =>
+        index === questionIndex
+          ? {
+              ...question,
+              correctAnswer,
+            }
+          : question
+      )
+    );
+  };
 
   useEffect(() => {
-    if (!game) return;
+    const gameCode = game?.code;
+
+    if (!gameCode || !hostToken) return;
 
     const interval = setInterval(
       async () => {
         const response =
           await fetch(
-             `${API}/games/${game.code}`
+             `${API}/games/${gameCode}`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${hostToken}`,
+              },
+            }
           );
+
+        if (response.status === 401) {
+          logoutHost();
+          return;
+        }
 
         const updatedGame: Game =
           await response.json();
 
-        setGame(updatedGame);
+        applyGameUpdate(updatedGame);
       },
       2000
     );
 
     return () =>
       clearInterval(interval);
-  }, [game?.code]);
-
-  useEffect(() => {
-    if (!game) return;
-
-    if (
-      currentQuestionIndex.current ===
-      game.currentQuestion
-    ) {
-      return;
-    }
-
-    currentQuestionIndex.current =
-      game.currentQuestion;
-
-    if (game.currentQuestion < 0) {
-      setTimeLeft(
-        game.questionDurationSeconds ??
-          QUESTION_DURATION_SECONDS
-      );
-      return;
-    }
-
-    setTimeLeft(
-      game.questionDurationSeconds ??
-        QUESTION_DURATION_SECONDS
-    );
   }, [
-    game?.currentQuestion,
-    game?.questionDurationSeconds,
+    game?.code,
+    hostToken,
+    logoutHost,
+    applyGameUpdate,
   ]);
 
-  useEffect(() => {
-    if (!game) return;
+  const currentQuestionNumber =
+    game?.currentQuestion ?? -1;
+  const questionCount =
+    game?.questions.length ?? 0;
 
-    if (game.currentQuestion < 0) return;
+  useEffect(() => {
+    if (currentQuestionNumber < 0) return;
 
     if (
-      game.currentQuestion >=
-      game.questions.length
+      currentQuestionNumber >= questionCount
     ) {
       return;
     }
@@ -157,8 +394,8 @@ export default function Host() {
     return () =>
       clearTimeout(timer);
   }, [
-    game?.currentQuestion,
-    game?.questions.length,
+    currentQuestionNumber,
+    questionCount,
     timeLeft,
   ]);
 
@@ -173,9 +410,111 @@ export default function Host() {
     );
 
   const visibleRanking =
-    liveRanking.length > 0
-      ? liveRanking
-      : leaderboard;
+    liveRanking;
+
+  if (!hostToken) {
+    return (
+      <div
+        className="
+          min-h-screen
+          bg-gradient-to-br
+          from-slate-950
+          via-purple-950
+          to-black
+          text-white
+          flex
+          items-center
+          justify-center
+          p-6
+        "
+      >
+        <div
+          className="
+            bg-white/10
+            backdrop-blur-xl
+            rounded-3xl
+            p-8
+            w-full
+            max-w-md
+          "
+        >
+          <h1
+            className="
+              text-4xl
+              font-bold
+              mb-6
+            "
+          >
+            Host Asklyx
+          </h1>
+
+          <input
+            value={username}
+            onChange={(event) =>
+              setUsername(event.target.value)
+            }
+            placeholder="Usuario"
+            className="
+              w-full
+              mb-3
+              rounded-xl
+              bg-white/10
+              border
+              border-white/20
+              p-3
+              text-white
+              placeholder:text-slate-400
+            "
+          />
+
+          <input
+            value={password}
+            onChange={(event) =>
+              setPassword(event.target.value)
+            }
+            placeholder="Contraseña"
+            type="password"
+            className="
+              w-full
+              mb-4
+              rounded-xl
+              bg-white/10
+              border
+              border-white/20
+              p-3
+              text-white
+              placeholder:text-slate-400
+            "
+          />
+
+          <button
+            onClick={loginHost}
+            className="
+              w-full
+              p-3
+              rounded-xl
+              bg-fuchsia-600
+              hover:bg-fuchsia-500
+              font-bold
+            "
+          >
+            Entrar
+          </button>
+
+          {loginError && (
+            <p
+              className="
+                mt-4
+                text-red-300
+              "
+            >
+              {loginError}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -197,15 +536,277 @@ export default function Host() {
           mx-auto
         "
       >
-        <h1
+        <div
           className="
-            text-5xl
-            font-bold
+            flex
+            items-center
+            justify-between
+            gap-4
             mb-8
           "
         >
-          🎮 Asklyx Control Center
-        </h1>
+          <h1
+            className="
+              text-5xl
+              font-bold
+            "
+          >
+            🎮 Asklyx Control Center
+          </h1>
+
+          <button
+            onClick={logoutHost}
+            className="
+              rounded-xl
+              bg-white/10
+              hover:bg-white/20
+              px-4
+              py-3
+            "
+          >
+            Salir
+          </button>
+        </div>
+
+        {configOpen && (
+          <div
+            className="
+              bg-white/10
+              backdrop-blur-xl
+              rounded-3xl
+              p-6
+              mb-6
+            "
+          >
+            <div
+              className="
+                flex
+                items-center
+                justify-between
+                gap-4
+                mb-6
+              "
+            >
+              <h2
+                className="
+                  text-3xl
+                  font-bold
+                "
+              >
+                Configurar Quiz
+              </h2>
+
+              <button
+                onClick={() =>
+                  setConfigOpen(false)
+                }
+                className="
+                  rounded-xl
+                  bg-white/10
+                  hover:bg-white/20
+                  px-4
+                  py-2
+                "
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div
+              className="
+                grid
+                gap-5
+              "
+            >
+              {questionsDraft.map(
+                (question, questionIndex) => (
+                  <div
+                    key={
+                      question.id ||
+                      questionIndex
+                    }
+                    className="
+                      rounded-2xl
+                      bg-black/20
+                      p-5
+                    "
+                  >
+                    <div
+                      className="
+                        flex
+                        items-center
+                        justify-between
+                        gap-4
+                        mb-4
+                      "
+                    >
+                      <h3
+                        className="
+                          text-xl
+                          font-bold
+                        "
+                      >
+                        Pregunta{" "}
+                        {questionIndex + 1}
+                      </h3>
+
+                      <button
+                        onClick={() =>
+                          removeQuestion(
+                            questionIndex
+                          )
+                        }
+                        className="
+                          rounded-xl
+                          bg-red-600
+                          hover:bg-red-500
+                          px-3
+                          py-2
+                        "
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+
+                    <textarea
+                      value={question.text}
+                      onChange={(event) =>
+                        updateQuestionText(
+                          questionIndex,
+                          event
+                        )
+                      }
+                      placeholder="Escribe la pregunta"
+                      className="
+                        w-full
+                        min-h-24
+                        rounded-xl
+                        bg-white/10
+                        border
+                        border-white/20
+                        p-3
+                        text-white
+                        placeholder:text-slate-400
+                        mb-4
+                      "
+                    />
+
+                    <div
+                      className="
+                        grid
+                        md:grid-cols-2
+                        gap-3
+                      "
+                    >
+                      {question.options.map(
+                        (
+                          option,
+                          optionIndex
+                        ) => (
+                          <label
+                            key={optionIndex}
+                            className="
+                              flex
+                              items-center
+                              gap-3
+                              rounded-xl
+                              bg-white/5
+                              p-3
+                            "
+                          >
+                            <input
+                              type="radio"
+                              name={`correct-${questionIndex}`}
+                              checked={
+                                question.correctAnswer ===
+                                optionIndex
+                              }
+                              onChange={() =>
+                                updateCorrectAnswer(
+                                  questionIndex,
+                                  optionIndex
+                                )
+                              }
+                            />
+
+                            <input
+                              value={option}
+                              onChange={(event) =>
+                                updateOption(
+                                  questionIndex,
+                                  optionIndex,
+                                  event
+                                )
+                              }
+                              placeholder={`Opción ${optionIndex + 1}`}
+                              className="
+                                w-full
+                                rounded-lg
+                                bg-transparent
+                                border
+                                border-white/20
+                                p-2
+                                text-white
+                                placeholder:text-slate-400
+                              "
+                            />
+                          </label>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+
+            <div
+              className="
+                flex
+                flex-wrap
+                gap-3
+                mt-6
+              "
+            >
+              <button
+                onClick={addQuestion}
+                className="
+                  rounded-xl
+                  bg-blue-600
+                  hover:bg-blue-500
+                  px-4
+                  py-3
+                "
+              >
+                Agregar Pregunta
+              </button>
+
+              <button
+                onClick={saveQuestions}
+                className="
+                  rounded-xl
+                  bg-green-600
+                  hover:bg-green-500
+                  px-4
+                  py-3
+                  font-bold
+                "
+              >
+                Guardar Quiz
+              </button>
+            </div>
+
+            {configMessage && (
+              <p
+                className="
+                  mt-4
+                  text-fuchsia-200
+                "
+              >
+                {configMessage}
+              </p>
+            )}
+          </div>
+        )}
 
         <div
           className="
@@ -281,8 +882,7 @@ export default function Host() {
             </button>
 
             <button
-              onClick={loadLeaderboard}
-              disabled={!game}
+              onClick={openQuizConfig}
               className="
                 w-full
                 p-3
@@ -292,7 +892,7 @@ export default function Host() {
                 hover:bg-yellow-500
               "
             >
-              Ver Ranking
+              Configurar Quiz
             </button>
 
             {game && (
