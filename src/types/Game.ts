@@ -6,4 +6,5 @@ export interface Game {
   players: Player[];
   questions: Question[];
   currentQuestion: number;
+  questionDurationSeconds?: number;
 }

@@ -1,7 +1,13 @@
-import { useState, useEffect } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import type { Game } from "../types/Game";
 import type { Player } from "../types/Player";
 import { API } from "../config/api";
+
+const QUESTION_DURATION_SECONDS = 15;
 
 export default function Host() {
   const [game, setGame] =
@@ -9,6 +15,12 @@ export default function Host() {
 
   const [leaderboard, setLeaderboard] =
     useState<Player[]>([]);
+
+  const [timeLeft, setTimeLeft] =
+    useState(QUESTION_DURATION_SECONDS);
+
+  const currentQuestionIndex =
+    useRef<number | null>(null);
 
   const createGame = async () => {
     const response = await fetch(
@@ -92,10 +104,78 @@ export default function Host() {
       clearInterval(interval);
   }, [game?.code]);
 
+  useEffect(() => {
+    if (!game) return;
+
+    if (
+      currentQuestionIndex.current ===
+      game.currentQuestion
+    ) {
+      return;
+    }
+
+    currentQuestionIndex.current =
+      game.currentQuestion;
+
+    if (game.currentQuestion < 0) {
+      setTimeLeft(
+        game.questionDurationSeconds ??
+          QUESTION_DURATION_SECONDS
+      );
+      return;
+    }
+
+    setTimeLeft(
+      game.questionDurationSeconds ??
+        QUESTION_DURATION_SECONDS
+    );
+  }, [
+    game?.currentQuestion,
+    game?.questionDurationSeconds,
+  ]);
+
+  useEffect(() => {
+    if (!game) return;
+
+    if (game.currentQuestion < 0) return;
+
+    if (
+      game.currentQuestion >=
+      game.questions.length
+    ) {
+      return;
+    }
+
+    if (timeLeft <= 0) return;
+
+    const timer = setTimeout(() => {
+      setTimeLeft(prev =>
+        Math.max(0, prev - 1)
+      );
+    }, 1000);
+
+    return () =>
+      clearTimeout(timer);
+  }, [
+    game?.currentQuestion,
+    game?.questions.length,
+    timeLeft,
+  ]);
+
   const currentQuestion =
     game?.questions?.[
       game.currentQuestion
     ];
+
+  const liveRanking =
+    [...(game?.players ?? [])].sort(
+      (a, b) => b.score - a.score
+    );
+
+  const visibleRanking =
+    liveRanking.length > 0
+      ? liveRanking
+      : leaderboard;
 
   return (
     <div
@@ -273,6 +353,65 @@ export default function Host() {
 
             {currentQuestion ? (
               <>
+                <div
+                  className="
+                    mb-6
+                    flex
+                    items-center
+                    justify-between
+                    gap-4
+                    rounded-2xl
+                    bg-black/20
+                    p-4
+                  "
+                >
+                  <div>
+                    <p
+                      className="
+                        text-sm
+                        text-slate-300
+                      "
+                    >
+                      Cronómetro
+                    </p>
+
+                    <p
+                      className="
+                        text-4xl
+                        font-black
+                        text-fuchsia-300
+                      "
+                    >
+                      {timeLeft}s
+                    </p>
+                  </div>
+
+                  <div
+                    className="
+                      text-right
+                    "
+                  >
+                    <p
+                      className="
+                        text-sm
+                        text-slate-300
+                      "
+                    >
+                      Puntos máximos ahora
+                    </p>
+
+                    <p
+                      className="
+                        text-2xl
+                        font-bold
+                        text-yellow-300
+                      "
+                    >
+                      {timeLeft * 100}
+                    </p>
+                  </div>
+                </div>
+
                 <h3
                   className="
                     text-3xl
@@ -382,7 +521,7 @@ export default function Host() {
               🏆 Ranking
             </h2>
 
-            {leaderboard.map(
+            {visibleRanking.map(
               (
                 player,
                 index
@@ -417,6 +556,17 @@ export default function Host() {
                   </span>
                 </div>
               )
+            )}
+
+            {visibleRanking.length === 0 && (
+              <p
+                className="
+                  text-slate-300
+                "
+              >
+                El ranking aparecerá cuando
+                entren jugadoras.
+              </p>
             )}
           </div>
         </div>
