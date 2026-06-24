@@ -1,12 +1,12 @@
 import type { Game } from "./types/Game.js";
 import type { Player } from "./types/Player.js";
+import type { Question } from "./types/Question.js";
 
 const games = new Map<string, Game>();
 const QUESTION_DURATION_SECONDS = 15;
+let configuredQuestions: Question[] | null = null;
 
-export function createGame() {
-
-const questions = [
+const defaultQuestions: Question[] = [
 {
 "id": "1",
 "text": "¿Qué método HTTP se utiliza comúnmente para obtener datos de una API en Python?",
@@ -75,6 +75,32 @@ const questions = [
 }
 ];
 
+function cloneQuestions(questions: Question[]) {
+  return questions.map((question) => ({
+    ...question,
+    options: [...question.options],
+  }));
+}
+
+export function getConfiguredQuestions() {
+  return cloneQuestions(
+    configuredQuestions ??
+      defaultQuestions
+  );
+}
+
+export function setConfiguredQuestions(
+  questions: Question[]
+) {
+  configuredQuestions =
+    cloneQuestions(questions);
+
+  return getConfiguredQuestions();
+}
+
+export function createGame() {
+  const questions =
+    getConfiguredQuestions();
 
   const code = generateCode();
 

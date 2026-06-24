@@ -62,7 +62,7 @@ export default function Home() {
             mb-4
           "
         >
-          🎮 Asklyx
+          🎮 Lilihoot
         </h1>
 
         <p

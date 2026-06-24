@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -39,7 +40,22 @@ export default function Quiz() {
   const currentQuestionId =
     useRef<string | null>(null);
 
-  const loadQuestion = async () => {
+  const loadLeaderboard =
+    useCallback(async () => {
+      if (!code) return;
+
+      const response = await fetch(
+         `${API}/games/${code}/leaderboard`
+      );
+
+      const data: Player[] =
+        await response.json();
+
+      console.log("Leaderboard:", data);
+      setLeaderboard(data);
+    }, [code]);
+
+  const loadQuestion = useCallback(async () => {
     if (!code) return;
 
     const response = await fetch(
@@ -78,19 +94,7 @@ export default function Quiz() {
     setWaiting(false);
     setFinished(false);
     setQuestion(data);
-  };
-
-  const loadLeaderboard = async () => {
-    const response = await fetch(
-       `${API}/games/${code}/leaderboard`
-    );
-
-    const data: Player[] =
-      await response.json();
-
-    console.log("Leaderboard:", data);
-    setLeaderboard(data);
-  };
+  }, [code, loadLeaderboard]);
 
   const [windowSize, setWindowSize] =
   useState({
@@ -99,16 +103,22 @@ export default function Quiz() {
   });
 
   useEffect(() => {
-    loadQuestion();
+    const firstLoad = setTimeout(() => {
+      void loadQuestion();
+    }, 0);
 
     const interval = setInterval(
-      loadQuestion,
+      () => {
+        void loadQuestion();
+      },
       2000
     );
 
-    return () =>
+    return () => {
+      clearTimeout(firstLoad);
       clearInterval(interval);
-  }, []);
+    };
+  }, [loadQuestion]);
 
   useEffect(() => {
     if (answered) return;
@@ -243,7 +253,7 @@ if (finished) {
           <h1 className="text-5xl md:text-6xl text-center mb-4">🏆</h1>
 
           <h2 className="text-white text-center text-3xl md:text-5xl font-bold mb-10 md:mb-16">
-            🏆 Campeonas Asklyx 🏆
+            🏆 Campeonas Lilihoot 🏆
           </h2>
 
           {/* Contenedor del podio responsivo */}
