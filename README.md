@@ -1,73 +1,236 @@
-# React + TypeScript + Vite
+# 🎮 Asklyx Quiz Live
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Una plataforma de quizzes en tiempo real inspirada en Kahoot y Mentimeter, desarrollada para sesiones educativas y dinámicas de aprendizaje.
 
-Currently, two official plugins are available:
+## ❤️ Agradecimientos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+A todas las participantes que probaron el sistema durante las sesiones de Tecnolochicas PRO y ayudaron a validar el MVP con más de 50 usuarios simultáneos.
 
-## React Compiler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Demo
 
-## Expanding the ESLint configuration
+Frontend:
+https://asklyx-quiz-sandy.vercel.app
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Backend:
+https://asklyx-quiz.onrender.com
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## ✨ Características
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Creación de salas de juego
+- Código único por partida
+- Participación en tiempo real
+- Sistema de puntaje basado en velocidad
+- Ranking dinámico
+- Podio final animado
+- Diseño responsive para computadora y móvil
+- Interfaz moderna con animaciones
+
+---
+
+## 🛠️ Tecnologías utilizadas
+
+### Frontend
+
+- React
+- TypeScript
+- Vite
+- TailwindCSS
+- Framer Motion
+- React Confetti
+- React Router DOM
+
+### Backend
+
+- Node.js
+- Express
+- TypeScript
+- CORS
+
+---
+
+## 📸 Flujo de uso
+
+### 1. El experto crea una sala
+
+Desde el panel de Host se genera un código único:
+
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+BEDU-3346
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Los participantes ingresan
+
+Acceden a:
+
+```
+
+/join
+
+```
+
+y capturan:
+
+- Nombre
+- Código de juego
+
+### 3. Comienza el quiz
+
+El Host inicia la sesión y controla el avance entre preguntas.
+
+### 4. Sistema de puntos
+
+Cada respuesta correcta suma puntos según la rapidez:
+
+```ts
+score += timeLeft * 100;
+```
+
+Ejemplo:
+
+| Tiempo restante | Puntos |
+| --------------- | ------- |
+| 10 segundos | 1000 |
+| 8 segundos | 800 |
+| 5 segundos | 500 |
+
+---
+
+## 🏆 Ranking
+
+Al finalizar la partida se genera un podio con:
+
+🥇 Primer lugar
+
+🥈 Segundo lugar
+
+🥉 Tercer lugar
+
+Incluyendo efectos visuales y celebración con confeti.
+
+---
+
+## 📂 Estructura del proyecto
+
+```
+
+quiz-live/
+│
+├── src/
+│ ├── pages/
+│ │ ├── Home.tsx
+│ │ ├── Host.tsx
+│ │ ├── Join.tsx
+│ │ └── Quiz.tsx
+│ │
+│ ├── config/
+│ │ └── api.ts
+│ │
+│ └── types/
+│
+├── server/
+│ ├── src/
+│ │ ├── index.ts
+│ │ ├── gameManager.ts
+│ │ └── types/
+│ │
+│ └── package.json
+│
+└── README.md
+
+```
+
+---
+
+## 🔧 Instalación local
+
+### Frontend
+
+```bash
+npm install
+npm run dev
+```
+
+Aplicación disponible en:
+
+```bash
+http://localhost:5173
+```
+
+### Backend
+
+```bash
+cd server
+
+npm install
+
+npm run dev
+```
+
+Servidor disponible en:
+
+```bash
+http://localhost:3001
+```
+
+---
+
+## 🌎 Variables de entorno
+
+Frontend:
+
+```env
+VITE_API_URL=https://asklyx-quiz.onrender.com
+```
+
+---
+
+## 📝 Ejemplo de preguntas
+
+```json
+{
+  "id": "1",
+  "text": "¿Qué método HTTP se utiliza comúnmente para obtener datos de una API en Python?",
+  "options": [
+    "POST",
+    "GET",
+    "PUT",
+    "DELETE"
+  ],
+  "correctAnswer": 1
+}
+```
+
+---
+
+## 💡 Próximas mejoras
+
+- Autenticación para Host
+- Carga de preguntas desde JSON
+- Editor visual de preguntas
+- Leaderboard en tiempo real
+- Temporizador sincronizado desde servidor
+- Persistencia en base de datos
+- WebSockets
+- Exportación de resultados
+- Código QR para acceso rápido
+
+---
+
+## 👩‍💻 Autora
+
+**Rocío Liliana Estevez**
+
+Desarrollado como proyecto educativo para Tecnolochicas PRO y sesiones de formación en Ciencia de Datos.
+
+GitHub:
+https://github.com/rootLiliana
+
+---
+
+
 ```
