@@ -95,7 +95,9 @@ app.listen(PORT, () => {
   );
 });
 
-app.use(cors());
+app.use(cors({
+    origin: "*"
+  }));
 app.use(express.json());
 
 app.get("/health", (_, res) => {
@@ -105,6 +107,8 @@ app.get("/health", (_, res) => {
 });
 
 app.post("/host/login", (req, res) => {
+   console.log("req.body:", req.body);
+
   const { username, password } = req.body;
   const credentials =
     getHostCredentials();
