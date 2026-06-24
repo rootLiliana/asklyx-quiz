@@ -253,7 +253,7 @@ if (finished) {
           <h1 className="text-5xl md:text-6xl text-center mb-4">🏆</h1>
 
           <h2 className="text-white text-center text-3xl md:text-5xl font-bold mb-10 md:mb-16">
-            🏆 Campeonas Asklyx 🏆
+            🏆 Campeonas Lilihoot 🏆
           </h2>
 
           {/* Contenedor del podio responsivo */}

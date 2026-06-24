@@ -211,7 +211,7 @@ export default function Join() {
           text-transparent
         "
       >
-        🎮 Asklyx
+        🎮 Lilihoot
       </h1>
 
       <input

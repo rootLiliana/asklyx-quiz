@@ -445,7 +445,7 @@ export default function Host() {
               mb-6
             "
           >
-            Host Asklyx
+            Host Lilihoot
           </h1>
 
           <input
@@ -551,7 +551,7 @@ export default function Host() {
               font-bold
             "
           >
-            🎮 Asklyx Control Center
+            🎮 Lilihoot Control Center
           </h1>
 
           <button
@@ -571,13 +571,31 @@ export default function Host() {
         {configOpen && (
           <div
             className="
-              bg-white/10
-              backdrop-blur-xl
-              rounded-3xl
-              p-6
-              mb-6
+              fixed
+              inset-0
+              z-50
+              flex
+              items-center
+              justify-center
+              bg-black/70
+              backdrop-blur-sm
+              p-4
             "
           >
+            <div
+              className="
+                max-h-[90vh]
+                w-full
+                max-w-5xl
+                overflow-y-auto
+                rounded-3xl
+                bg-slate-950/95
+                border
+                border-white/10
+                p-6
+                shadow-2xl
+              "
+            >
             <div
               className="
                 flex
@@ -805,6 +823,7 @@ export default function Host() {
                 {configMessage}
               </p>
             )}
+            </div>
           </div>
         )}
 
