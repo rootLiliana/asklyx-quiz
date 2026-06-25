@@ -12,6 +12,22 @@ import type { Question } from "./types/Question.js";
 
 loadEnvFile();
 
+if (
+  !process.env.HOST_USERNAME ||
+  !process.env.HOST_PASSWORD
+) {
+  console.error(
+    "❌ HOST_USERNAME o HOST_PASSWORD no están configurados."
+  );
+
+  process.exit(1);
+}else {
+  console.log(
+    "✅ HOST_USERNAME y HOST_PASSWORD están configurados."
+  );
+}
+
+
 const app = express();
 const PORT =
   process.env.PORT || 3001;
@@ -118,8 +134,9 @@ app.post("/host/login", (req, res) => {
     !credentials.password
   ) {
     return res.status(500).json({
-      message:
-        "Host credentials are not configured",
+      code: "ENV_NOT_CONFIGURED",
+  message:
+    "El servidor no tiene configuradas las credenciales del host.",
     });
   }
 
@@ -127,9 +144,11 @@ app.post("/host/login", (req, res) => {
     username !== credentials.username ||
     password !== credentials.password
   ) {
-    return res.status(401).json({
-      message: "Invalid credentials",
-    });
+   return res.status(401).json({
+  code: "INVALID_CREDENTIALS",
+  message:
+    "Usuario o contraseña incorrectos.",
+});
   }
 
   const token = crypto.randomUUID();

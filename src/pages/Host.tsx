@@ -414,6 +414,8 @@ export default function Host() {
 
   if (!hostToken) {
     return (
+
+      
       <div
         className="
           min-h-screen
@@ -438,6 +440,9 @@ export default function Host() {
             max-w-md
           "
         >
+          <p className="text-xs text-slate-400">
+            API: {API}
+          </p>
           <h1
             className="
               text-4xl
