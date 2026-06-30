@@ -7,85 +7,66 @@ const QUESTION_DURATION_SECONDS = 15;
 let configuredQuestions: Question[] | null = null;
 
 const defaultQuestions: Question[] = [
-{
-"id": "1",
-"text": "¿Qué método HTTP se utiliza comúnmente para obtener datos de una API en Python?",
-"options": [
-"POST",
-"GET",
-"PUT",
-"DELETE"
-],
-"correctAnswer": 1,
- "explanation":
-    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
-
-},
-{
-"id": "2",
-"text": "¿Qué significa API?",
-"options": [
-"Advanced Programming Interface",
-"Application Programming Interface",
-"Application Processing Interface",
-"Automated Programming Interface"
-],
-"correctAnswer": 1,
- "explanation":
-    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
-},
-{
-"id": "3",
-"text": "En Python para interactuar con bases de datos MySQL y PostgreSQL, ¿qué biblioteca se utiliza para PostgreSQL?",
-"options": [
-"PyMySQL",
-"MySQLdb",
-"SQLite3",
-"psycopg2"
-],
-"correctAnswer": 3,
- "explanation":
-    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
-},
-{
-"id": "4",
-"text": "¿Qué cursor se utiliza para ejecutar una consulta SQL en una base de datos MySQL?",
-"options": [
-"cursor.execute()",
-"cursor.query()",
-"cursor.run()",
-"cursor.commit()"
-],
-"correctAnswer": 0,
- "explanation":
-    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
-},
-{
-"id": "5",
-"text": "¿En MongoDB qué método se utiliza para insertar un documento en una colección?",
-"options": [
-"insert_one()",
-"add_one()",
-"insert_document()",
-"add_document()"
-],
-"correctAnswer": 0,
- "explanation":
-    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
-},
-{
-"id": "6",
-"text": "¿Cuál de los siguientes NO es un método HTTP?",
-"options": [
-"GET",
-"POST",
-"FETCH",
-"DELETE"
-],
-"correctAnswer": 2,
- "explanation":
-    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
-}
+  {
+    "id": "1",
+    "text": "¿Cuál es la principal ventaja de utilizar funciones vectorizadas en Pandas?",
+    "options": [
+      "Permiten recorrer los datos usando ciclos for.",
+      "Aplican operaciones sobre toda la colección de datos de forma eficiente.",
+      "Solo funcionan con columnas numéricas.",
+      "Eliminan automáticamente los valores nulos."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Las funciones vectorizadas aplican una operación a todos los elementos de una Serie o DataFrame de manera optimizada, evitando recorrer los datos elemento por elemento."
+  },
+  {
+    "id": "2",
+    "text": "¿Cuál de las siguientes funciones es una función de agregación en Pandas?",
+    "options": [
+      "sqrt()",
+      "replace()",
+      "mean()",
+      "astype()"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Las funciones de agregación resumen varios valores en uno solo. mean() calcula el promedio de los datos."
+  },
+  {
+    "id": "3",
+    "text": "¿Qué hace Pandas al realizar una operación entre dos DataFrames?",
+    "options": [
+      "Une las filas según el orden en que aparecen.",
+      "Elimina automáticamente las filas con valores nulos.",
+      "Alinea los datos utilizando los índices y nombres de las columnas.",
+      "Solo permite la operación si ambos DataFrames tienen el mismo tamaño."
+    ],
+    "correctAnswer": 2,
+    "explanation": "Pandas alinea automáticamente las filas y columnas por sus etiquetas antes de realizar operaciones entre DataFrames."
+  },
+  {
+    "id": "4",
+    "text": "¿Qué realiza el método dropna(how='any')?",
+    "options": [
+      "Elimina las columnas que contienen valores nulos.",
+      "Reemplaza los valores faltantes por cero.",
+      "Elimina las filas que tengan al menos un valor faltante.",
+      "Elimina únicamente los registros duplicados."
+    ],
+    "correctAnswer": 2,
+    "explanation": "Con how='any', cualquier fila que contenga al menos un valor faltante (NaN) será eliminada."
+  },
+  {
+    "id": "5",
+    "text": "¿Cuál es el objetivo de convertir los nombres de las columnas a snake_case?",
+    "options": [
+      "Reducir el tamaño del DataFrame.",
+      "Mejorar la consistencia y facilitar el acceso a las columnas.",
+      "Eliminar automáticamente los espacios y valores nulos.",
+      "Ordenar las columnas alfabéticamente."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Utilizar snake_case hace que los nombres de las columnas sean más consistentes y fáciles de utilizar en el código."
+  }
 ];
 
 function cloneQuestions(questions: Question[]) {
