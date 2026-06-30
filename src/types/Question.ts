@@ -4,4 +4,5 @@ export interface Question {
   options: string[];
   correctAnswer: number;
   durationSeconds?: number;
+  explanation: string;
 }

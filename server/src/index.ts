@@ -79,6 +79,10 @@ function isValidQuestion(
   return (
     typeof candidate.text === "string" &&
     candidate.text.trim().length > 0 &&
+
+    typeof candidate.explanation === "string" &&
+    candidate.explanation.trim().length > 0 &&
+
     Array.isArray(candidate.options) &&
     candidate.options.length >= 2 &&
     candidate.options.every(
@@ -86,6 +90,7 @@ function isValidQuestion(
         typeof option === "string" &&
         option.trim().length > 0
     ) &&
+
     typeof candidate.correctAnswer ===
       "number" &&
     Number.isInteger(
@@ -199,6 +204,8 @@ app.post(
           ),
           correctAnswer:
             question.correctAnswer,
+            explanation:
+          question.explanation.trim(),
         })
       );
 
