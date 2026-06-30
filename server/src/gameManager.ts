@@ -16,7 +16,10 @@ const defaultQuestions: Question[] = [
 "PUT",
 "DELETE"
 ],
-"correctAnswer": 1
+"correctAnswer": 1,
+ "explanation":
+    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
+
 },
 {
 "id": "2",
@@ -27,7 +30,9 @@ const defaultQuestions: Question[] = [
 "Application Processing Interface",
 "Automated Programming Interface"
 ],
-"correctAnswer": 1
+"correctAnswer": 1,
+ "explanation":
+    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
 },
 {
 "id": "3",
@@ -38,7 +43,9 @@ const defaultQuestions: Question[] = [
 "SQLite3",
 "psycopg2"
 ],
-"correctAnswer": 3
+"correctAnswer": 3,
+ "explanation":
+    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
 },
 {
 "id": "4",
@@ -49,7 +56,9 @@ const defaultQuestions: Question[] = [
 "cursor.run()",
 "cursor.commit()"
 ],
-"correctAnswer": 0
+"correctAnswer": 0,
+ "explanation":
+    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
 },
 {
 "id": "5",
@@ -60,7 +69,9 @@ const defaultQuestions: Question[] = [
 "insert_document()",
 "add_document()"
 ],
-"correctAnswer": 0
+"correctAnswer": 0,
+ "explanation":
+    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
 },
 {
 "id": "6",
@@ -71,7 +82,9 @@ const defaultQuestions: Question[] = [
 "FETCH",
 "DELETE"
 ],
-"correctAnswer": 2
+"correctAnswer": 2,
+ "explanation":
+    "GET se utiliza para obtener información del servidor. POST se usa para enviar datos."
 }
 ];
 
@@ -240,10 +253,12 @@ export function submitAnswer(
     player.score += safeTimeLeft * 100;
   }
 
-  return {
-    correct: isCorrect,
-    score: player.score,
-  };
+    return {
+      correct: isCorrect,
+      score: player.score,
+      correctAnswer: question.correctAnswer,
+      explanation: question.explanation,
+    };
 }
 
 

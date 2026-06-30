@@ -8,6 +8,7 @@ import {
 import type { Game } from "../types/Game";
 import type { Question } from "../types/Question";
 import { API } from "../config/api";
+import { motion } from "framer-motion";
 
 const QUESTION_DURATION_SECONDS = 15;
 const EMPTY_QUESTION: Question = {
@@ -15,6 +16,7 @@ const EMPTY_QUESTION: Question = {
   text: "",
   options: ["", "", "", ""],
   correctAnswer: 0,
+  explanation: "",
 };
 
 export default function Host() {
@@ -48,6 +50,9 @@ export default function Host() {
 
   const [configMessage, setConfigMessage] =
     useState("");
+
+  const [showExplanation, setShowExplanation] =
+  useState(false);
 
   const currentQuestionIndex =
     useRef<number | null>(null);
@@ -177,8 +182,11 @@ export default function Host() {
 
     const updatedGame: Game =
       await response.json();
+      
 
     applyGameUpdate(updatedGame);
+
+    setShowExplanation(false);
   };
 
   const loadQuestions = async () => {
@@ -282,6 +290,24 @@ export default function Host() {
       )
     );
   };
+
+  const updateExplanation = (
+  index: number,
+  event: ChangeEvent<HTMLTextAreaElement>
+) => {
+  const { value } = event.target;
+
+  setQuestionsDraft((questions) =>
+    questions.map((question, questionIndex) =>
+      questionIndex === index
+        ? {
+            ...question,
+            explanation: value,
+          }
+        : question
+    )
+  );
+};
 
   const updateOption = (
     questionIndex: number,
@@ -714,6 +740,29 @@ export default function Host() {
                       "
                     />
 
+                    <textarea
+                      value={question.explanation}
+                      onChange={(event) =>
+                        updateExplanation(
+                          questionIndex,
+                          event
+                        )
+                      }
+                      placeholder="Explicación que verán las alumnas después de responder..."
+                      className="
+                        w-full
+                        min-h-24
+                        rounded-xl
+                        bg-white/10
+                        border
+                        border-white/20
+                        p-3
+                        text-white
+                        placeholder:text-slate-400
+                        mb-4
+                      "
+                    />
+
                     <div
                       className="
                         grid
@@ -780,6 +829,8 @@ export default function Host() {
                   </div>
                 )
               )}
+
+
             </div>
 
             <div
@@ -958,6 +1009,7 @@ export default function Host() {
 
           {/* Pregunta Actual */}
 
+
           <div
             className="
               bg-white/10
@@ -1074,7 +1126,53 @@ export default function Host() {
                     )
                   )}
                 </div>
+               <button
+                onClick={() =>
+                  setShowExplanation(!showExplanation)
+                }
+                className="
+                  mt-6
+                  flex
+                  items-center
+                  gap-2
+                  rounded-xl
+                  bg-yellow-500/20
+                  px-4
+                  py-2
+                  hover:bg-yellow-500/40
+                "
+              >
+                💡
+                {showExplanation
+                  ? "Ocultar explicación"
+                  : "Mostrar explicación"}
+              </button>
+
+              {showExplanation && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="
+                    mt-4
+                    rounded-xl
+                    bg-green-500/10
+                    border
+                    border-green-400/30
+                    p-4
+                  "
+                >
+                  <p className="text-sm text-green-300 mb-2">
+                    💡 Explicación
+                  </p>
+
+                  <p className="text-white">
+                    {currentQuestion.explanation}
+                  </p>
+                </motion.div>
+              )}
               </>
+
+              
             ) : (
               <div
                 className="

@@ -9,6 +9,8 @@ import type { Question } from "../types/Question";
 import type { Player } from "../types/Player";
 import { API } from "../config/api";
 import Confetti from "react-confetti";
+import type { SubmitAnswerResponse } from "../types/SubmitAnswerResponse";
+import type { QuestionResponse } from "../types/QuestionResponse";
 
 const QUESTION_DURATION_SECONDS = 15;
 
@@ -23,6 +25,12 @@ export default function Quiz() {
     useState(false);
 
   const [result, setResult] =
+    useState("");
+
+  const [correctAnswer, setCorrectAnswer] =
+    useState<number | null>(null);
+
+  const [explanation, setExplanation] =
     useState("");
 
   const [timeLeft, setTimeLeft] =
@@ -45,7 +53,7 @@ export default function Quiz() {
       if (!code) return;
 
       const response = await fetch(
-         `${API}/games/${code}/leaderboard`
+        `${API}/games/${code}/leaderboard`
       );
 
       const data: Player[] =
@@ -59,21 +67,19 @@ export default function Quiz() {
     if (!code) return;
 
     const response = await fetch(
-       `${API}/games/${code}/question`
+      `${API}/games/${code}/question`
     );
 
-    const data = await response.json();
-
-    if (data.waiting) {
+    const data: QuestionResponse =
+      await response.json();
+    if ("waiting" in data) {
       setWaiting(true);
       return;
     }
 
-    if (data.finished) {
+    if ("finished" in data) {
       await loadLeaderboard();
-
       setFinished(true);
-
       return;
     }
 
@@ -89,6 +95,8 @@ export default function Quiz() {
       setTimeLeft(durationSeconds);
       setAnswered(false);
       setResult("");
+      setCorrectAnswer(null);
+      setExplanation("");
     }
 
     setWaiting(false);
@@ -97,10 +105,10 @@ export default function Quiz() {
   }, [code, loadLeaderboard]);
 
   const [windowSize, setWindowSize] =
-  useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+    useState({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
 
   useEffect(() => {
     const firstLoad = setTimeout(() => {
@@ -136,24 +144,24 @@ export default function Quiz() {
   }, [timeLeft, answered]);
 
   useEffect(() => {
-  const handleResize = () => {
-    setWindowSize({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
-  };
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
 
-  window.addEventListener(
-    "resize",
-    handleResize
-  );
-
-  return () =>
-    window.removeEventListener(
+    window.addEventListener(
       "resize",
       handleResize
     );
-}, []);
+
+    return () =>
+      window.removeEventListener(
+        "resize",
+        handleResize
+      );
+  }, []);
 
   const submitAnswer = async (
     answer: number
@@ -166,7 +174,7 @@ export default function Quiz() {
     if (!playerId) return;
 
     const response = await fetch(
-       `${API}/games/${code}/answer`,
+      `${API}/games/${code}/answer`,
       {
         method: "POST",
         headers: {
@@ -182,7 +190,7 @@ export default function Quiz() {
     );
 
 
-    const data =
+    const data: SubmitAnswerResponse =
       await response.json();
 
     setResult(
@@ -192,6 +200,8 @@ export default function Quiz() {
     );
 
     setAnswered(true);
+    setCorrectAnswer(data.correctAnswer);
+    setExplanation(data.explanation);
   };
 
   if (!code) {
@@ -237,99 +247,99 @@ export default function Quiz() {
   }
 
 
-if (finished) {
-  return (
-    <>
-      <Confetti
-        width={windowSize.width || 300}
-        height={windowSize.height || 600}
-        recycle={true}
-        numberOfPieces={250}
-      />
+  if (finished) {
+    return (
+      <>
+        <Confetti
+          width={windowSize.width || 300}
+          height={windowSize.height || 600}
+          recycle={true}
+          numberOfPieces={250}
+        />
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-black flex items-center justify-center p-4 md:p-6">
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-10 shadow-2xl w-full max-w-4xl z-10">
-          
-          <h1 className="text-5xl md:text-6xl text-center mb-4">🏆</h1>
+        <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-black flex items-center justify-center p-4 md:p-6">
+          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-10 shadow-2xl w-full max-w-4xl z-10">
 
-          <h2 className="text-white text-center text-3xl md:text-5xl font-bold mb-10 md:mb-16">
-            🏆 Campeonas Lilihoot 🏆
-          </h2>
+            <h1 className="text-5xl md:text-6xl text-center mb-4">🏆</h1>
 
-          {/* Contenedor del podio responsivo */}
-          <div className="flex flex-col md:flex-row items-center md:items-end justify-center gap-8 md:gap-6">
+            <h2 className="text-white text-center text-3xl md:text-5xl font-bold mb-10 md:mb-16">
+              🏆 Campeonas Lilihoot 🏆
+            </h2>
 
-            {/* SEGUNDO LUGAR (Aparece a la izquierda en PC [order-2], o segundo en móvil [order-2]) */}
-            <div className="flex flex-col items-center text-center order-2 w-full md:w-auto">
-              <h2 className="text-4xl md:text-5xl mb-2">🥈</h2>
-              <p className="text-white text-xl md:text-2xl mb-2 font-semibold">
-                {leaderboard[1]?.name}
-              </p>
-              {/* En móvil se oculta el bloque alto y se muestra una etiqueta compacta, en PC vuelve el bloque */}
-              <div className="hidden md:flex h-40 w-32 bg-slate-400 rounded-t-xl items-center justify-center text-white font-bold text-xl">
-                {leaderboard[1]?.score}
+            {/* Contenedor del podio responsivo */}
+            <div className="flex flex-col md:flex-row items-center md:items-end justify-center gap-8 md:gap-6">
+
+              {/* SEGUNDO LUGAR (Aparece a la izquierda en PC [order-2], o segundo en móvil [order-2]) */}
+              <div className="flex flex-col items-center text-center order-2 w-full md:w-auto">
+                <h2 className="text-4xl md:text-5xl mb-2">🥈</h2>
+                <p className="text-white text-xl md:text-2xl mb-2 font-semibold">
+                  {leaderboard[1]?.name}
+                </p>
+                {/* En móvil se oculta el bloque alto y se muestra una etiqueta compacta, en PC vuelve el bloque */}
+                <div className="hidden md:flex h-40 w-32 bg-slate-400 rounded-t-xl items-center justify-center text-white font-bold text-xl">
+                  {leaderboard[1]?.score}
+                </div>
+                <div className="md:hidden w-full max-w-xs bg-slate-400/30 border border-slate-400/50 p-3 rounded-xl text-white font-bold">
+                  {leaderboard[1]?.score} pts
+                </div>
               </div>
-              <div className="md:hidden w-full max-w-xs bg-slate-400/30 border border-slate-400/50 p-3 rounded-xl text-white font-bold">
-                {leaderboard[1]?.score} pts
-              </div>
-            </div>
 
-            {/* PRIMER LUGAR (Aparece en el centro en PC [order-1 o order-2 dependiendo del flex-row], en móvil primero [order-1]) */}
-            <div className="flex flex-col items-center text-center order-1 w-full md:w-auto mb-4 md:mb-0">
-              <h2 className="text-5xl md:text-6xl mb-1">👑</h2>
-              <h2 className="text-4xl md:text-5xl mb-2">🥇</h2>
-              <motion.p
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-                className="text-yellow-400 text-2xl md:text-3xl font-black mb-3 tracking-wide"
-              >
-                {leaderboard[0]?.name }
-              </motion.p>
-              
-              {/* Bloque para PC */}
-              <motion.div
-                animate={{
-                  y: [0, -8, 0],
-                  boxShadow: [
-                    "0 0 10px #facc15",
-                    "0 0 35px #facc15",
-                    "0 0 10px #facc15",
-                  ],
-                }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="hidden md:flex h-56 w-36 bg-yellow-500 rounded-t-xl items-center justify-center text-white font-bold text-2xl"
-              >
-                {leaderboard[0]?.score}
-              </motion.div>
-              
-              {/* Tarjeta para Móvil */}
-              <div className="md:hidden w-full max-w-xs bg-yellow-500/30 border-2 border-yellow-400 p-4 rounded-xl text-yellow-300 font-extrabold text-xl shadow-[0_0_15px_rgba(250,204,21,0.3)]">
-                {leaderboard[0]?.score} pts
-              </div>
-            </div>
+              {/* PRIMER LUGAR (Aparece en el centro en PC [order-1 o order-2 dependiendo del flex-row], en móvil primero [order-1]) */}
+              <div className="flex flex-col items-center text-center order-1 w-full md:w-auto mb-4 md:mb-0">
+                <h2 className="text-5xl md:text-6xl mb-1">👑</h2>
+                <h2 className="text-4xl md:text-5xl mb-2">🥇</h2>
+                <motion.p
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  className="text-yellow-400 text-2xl md:text-3xl font-black mb-3 tracking-wide"
+                >
+                  {leaderboard[0]?.name}
+                </motion.p>
 
-            {/* TERCER LUGAR (Aparece a la derecha en PC [order-3], o tercero en móvil [order-3]) */}
-            <div className="flex flex-col items-center text-center order-3 w-full md:w-auto">
-              <h2 className="text-4xl md:text-5xl mb-2">🥉</h2>
-              <p className="text-white text-xl md:text-2xl mb-2">
-                {leaderboard[2]?.name}
-              </p>
-              {/* Bloque para PC */}
-              <div className="hidden md:flex h-28 w-32 bg-orange-700 rounded-t-xl items-center justify-center text-white font-bold text-lg">
-                {leaderboard[2]?.score}
-              </div>
-              {/* Tarjeta para Móvil */}
-              <div className="md:hidden w-full max-w-xs bg-orange-700/30 border border-orange-700/50 p-3 rounded-xl text-white font-semibold">
-                {leaderboard[2]?.score} pts
-              </div>
-            </div>
+                {/* Bloque para PC */}
+                <motion.div
+                  animate={{
+                    y: [0, -8, 0],
+                    boxShadow: [
+                      "0 0 10px #facc15",
+                      "0 0 35px #facc15",
+                      "0 0 10px #facc15",
+                    ],
+                  }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="hidden md:flex h-56 w-36 bg-yellow-500 rounded-t-xl items-center justify-center text-white font-bold text-2xl"
+                >
+                  {leaderboard[0]?.score}
+                </motion.div>
 
-          </div> {/* <-- Aquí se cierra correctamente el contenedor de las tarjetas */}
+                {/* Tarjeta para Móvil */}
+                <div className="md:hidden w-full max-w-xs bg-yellow-500/30 border-2 border-yellow-400 p-4 rounded-xl text-yellow-300 font-extrabold text-xl shadow-[0_0_15px_rgba(250,204,21,0.3)]">
+                  {leaderboard[0]?.score} pts
+                </div>
+              </div>
+
+              {/* TERCER LUGAR (Aparece a la derecha en PC [order-3], o tercero en móvil [order-3]) */}
+              <div className="flex flex-col items-center text-center order-3 w-full md:w-auto">
+                <h2 className="text-4xl md:text-5xl mb-2">🥉</h2>
+                <p className="text-white text-xl md:text-2xl mb-2">
+                  {leaderboard[2]?.name}
+                </p>
+                {/* Bloque para PC */}
+                <div className="hidden md:flex h-28 w-32 bg-orange-700 rounded-t-xl items-center justify-center text-white font-bold text-lg">
+                  {leaderboard[2]?.score}
+                </div>
+                {/* Tarjeta para Móvil */}
+                <div className="md:hidden w-full max-w-xs bg-orange-700/30 border border-orange-700/50 p-3 rounded-xl text-white font-semibold">
+                  {leaderboard[2]?.score} pts
+                </div>
+              </div>
+
+            </div> {/* <-- Aquí se cierra correctamente el contenedor de las tarjetas */}
+          </div>
         </div>
-      </div>
-    </>
-  );
-}
+      </>
+    );
+  }
 
   if (!question) {
     return (
@@ -538,7 +548,52 @@ if (finished) {
               : result}
           </h2>
         </motion.div>
+
+
+        {correctAnswer !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="
+      mt-8
+      p-6
+      rounded-2xl
+      bg-white/10
+      border
+      border-fuchsia-400/30
+      text-white
+    "
+                        >
+                          <h3
+                className={`
+                  text-2xl
+                  font-bold
+                  mb-3
+                  ${
+                    result.includes("Correcto")
+                      ? "text-green-400"
+                      : "text-red-400"
+                  }
+                `}
+              >
+                {result.includes("Correcto")
+                  ? "🎉 ¡Excelente!"
+                  : "📚 Aprendamos"}
+              </h3>
+
+
+                  <p className="text-2xl font-bold text-green-300 mb-4">
+                  {question.options[correctAnswer]}
+                </p>
+
+                <p className="text-lg leading-relaxed">
+                  💡 {explanation}
+                </p>
+          
+          </motion.div>
+        )}
       </motion.div>
+
     </div>
   );
 }
