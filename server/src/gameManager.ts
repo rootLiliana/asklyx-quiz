@@ -1,6 +1,7 @@
-import type { Game } from "./types/Game.js";
+import type { Game, IceBreaker } from "./types/Game.js";
 import type { Player } from "./types/Player.js";
 import type { Question } from "./types/Question.js";
+
 
 const games = new Map<string, Game>();
 const QUESTION_DURATION_SECONDS = 15;
@@ -273,4 +274,54 @@ export function getLeaderboard(
 
 export function getGame(code: string) {
   return games.get(code);
+}
+
+// 1. Activa el icebreaker en el juego con una pregunta inicial
+export function startIcebreaker(code: string, question: string) {
+  const game = games.get(code);
+  if (!game) return null;
+
+  game.icebreaker = {
+    active: true,
+    question: question,
+    answers: []
+  };
+
+  return game.icebreaker;
+}
+
+// 2. Obtiene el estado actual del icebreaker
+export function getIcebreaker(code: string) {
+  const game = games.get(code);
+  if (!game || !game.icebreaker) return null;
+
+  return game.icebreaker;
+}
+
+// 3. Guarda la respuesta abierta de un jugador
+export function submitIcebreakerAnswer(code: string, playerName: string, text: string) {
+  const game = games.get(code);
+  if (!game || !game.icebreaker || !game.icebreaker.active) return null;
+
+  // Evitar respuestas duplicadas del mismo jugador (opcional)
+  const alreadyAnswered = game.icebreaker.answers.some(a => a.playerName === playerName);
+  if (alreadyAnswered) return { error: "Player already answered" };
+
+  const newAnswer = {
+    id: crypto.randomUUID(),
+    text,
+    playerName
+  };
+
+  game.icebreaker.answers.push(newAnswer);
+  return newAnswer;
+}
+
+// 4. Desactiva o cierra el icebreaker
+export function closeIcebreaker(code: string) {
+  const game = games.get(code);
+  if (!game || !game.icebreaker) return null;
+
+  game.icebreaker.active = false;
+  return game.icebreaker;
 }

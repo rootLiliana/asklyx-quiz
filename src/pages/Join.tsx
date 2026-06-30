@@ -41,6 +41,11 @@ export default function Join() {
       player.id
     );
 
+    localStorage.setItem(
+      "playerName",
+      name
+    );
+
       localStorage.setItem(
         "gameCode",
         game.code
@@ -48,7 +53,7 @@ export default function Join() {
 
 
     console.log(game);
-    navigate("/quiz");
+    navigate("/iceBreaker");
   };
 
   return (

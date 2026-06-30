@@ -7,4 +7,17 @@ export interface Game {
   questions: Question[];
   currentQuestion: number;
   questionDurationSeconds: number;
+  icebreaker?: IceBreaker;
+  
 }
+
+export interface IceBreaker {
+  active: boolean;
+  question: string;
+  answers: {
+    id: string;
+    text: string;
+    playerName: string;
+  }[];
+}
+

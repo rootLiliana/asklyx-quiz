@@ -6,7 +6,21 @@ import type {
   NextFunction,
 } from "express";
 
-import { createGame, joinGame, getGame, startGame, getCurrentQuestion,   submitAnswer, nextQuestion, getLeaderboard, getConfiguredQuestions, setConfiguredQuestions } from "./gameManager.js";
+import { createGame,
+   joinGame, 
+   getGame,
+    startGame, 
+    getCurrentQuestion,  
+     submitAnswer, 
+     nextQuestion, 
+     getLeaderboard,
+      getConfiguredQuestions, 
+  setConfiguredQuestions, 
+  startIcebreaker, 
+  getIcebreaker, 
+  submitIcebreakerAnswer, 
+  closeIcebreaker
+ } from "./gameManager.js";
 import { loadEnvFile } from "./env.js";
 import type { Question } from "./types/Question.js";
 
@@ -338,3 +352,64 @@ app.get(
     res.json(leaderboard);
   }
 );
+
+// 1. POST: El administrador/host inicia el Icebreaker con una pregunta abierta
+app.post("/games/:code/icebreaker", (req, res) => {
+  const { question } = req.body; // Ej: { "question": "¿Cuál es tu comida favorita?" }
+
+  if (!question) {
+    return res.status(400).json({ message: "Question is required" });
+  }
+
+  const icebreaker = startIcebreaker(req.params.code, question);
+
+  if (!icebreaker) {
+    return res.status(404).json({ message: "Game not found" });
+  }
+
+  res.status(201).json(icebreaker);
+});
+
+// 2. GET: Para que tanto el host como los jugadores vean la pregunta y las respuestas actuales
+app.get("/games/:code/icebreaker", (req, res) => {
+  const icebreaker = getIcebreaker(req.params.code);
+
+  if (!icebreaker) {
+    return res.status(404).json({ message: "Game or Icebreaker not found" });
+  }
+
+  res.json(icebreaker);
+});
+
+// 3. POST: El jugador envía su respuesta abierta cuando se une o mientras está activo el rompehielos
+app.post("/games/:code/icebreaker/answer", (req, res) => {
+  const { playerName, text } = req.body; // Ej: { "playerName": "Juan", "text": "Pizza" }
+
+  if (!playerName || !text) {
+    return res.status(400).json({ message: "playerName and text are required" });
+  }
+
+  const result = submitIcebreakerAnswer(req.params.code, playerName, text);
+
+  if (!result) {
+    return res.status(404).json({ message: "Game not found or Icebreaker is not active" });
+  }
+
+  // Si la función retornó el objeto de error por duplicado
+  if ('error' in result) {
+    return res.status(400).json({ message: result.error });
+  }
+
+  res.status(201).json(result);
+});
+
+// 4. PUT: El host decide cerrar el icebreaker para proceder con las preguntas de trivia de Pandas
+app.put("/games/:code/icebreaker/close", (req, res) => {
+  const icebreaker = closeIcebreaker(req.params.code);
+
+  if (!icebreaker) {
+    return res.status(404).json({ message: "Game or Icebreaker not found" });
+  }
+
+  res.json({ message: "Icebreaker closed successfully", icebreaker });
+});
