@@ -9,6 +9,7 @@ import type { Game } from "../types/Game";
 import type { Question } from "../types/Question";
 import { API } from "../config/api";
 import { motion } from "framer-motion";
+import type { IceBreaker } from "../types/IceBreaker";
 
 const QUESTION_DURATION_SECONDS = 15;
 const EMPTY_QUESTION: Question = {
@@ -53,6 +54,15 @@ export default function Host() {
 
   const [showExplanation, setShowExplanation] =
   useState(false);
+
+  const [showIceBreaker, setShowIceBreaker] =
+  useState(false);
+
+const [iceBreakerQuestion, setIceBreakerQuestion] =
+  useState("");
+
+const [iceBreakerData, setIceBreakerData] =
+  useState<IceBreaker | null>(null);
 
   const currentQuestionIndex =
     useRef<number | null>(null);
@@ -355,6 +365,45 @@ export default function Host() {
     );
   };
 
+const startIcebreakerHost = async () => {
+    if (!game || !iceBreakerQuestion) return;
+
+    const response = await fetch(`${API}/games/${game.code}/icebreaker`, {
+      method: "POST",
+      headers: {
+        ...authHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ question: iceBreakerQuestion }),
+    });
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
+
+    const data: IceBreaker = await response.json();
+    setIceBreakerData(data);
+  };
+
+  const closeIcebreakerHost = async () => {
+    if (!game) return;
+
+    const response = await fetch(`${API}/games/${game.code}/icebreaker/close`, {
+      method: "PUT",
+      headers: authHeaders,
+    });
+
+    if (response.status === 401) {
+      logoutHost();
+      return;
+    }
+
+    const data: { icebreaker: IceBreaker } = await response.json();
+    setIceBreakerData(data.icebreaker);
+    setShowIceBreaker(false); // Cierra el modal automáticamente al terminar
+  };
+
   useEffect(() => {
     const gameCode = game?.code;
 
@@ -437,6 +486,34 @@ export default function Host() {
 
   const visibleRanking =
     liveRanking;
+
+  
+    useEffect(() => {
+    const gameCode = game?.code;
+    if (!gameCode || !hostToken || !showIceBreaker) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API}/games/${gameCode}/icebreaker`, {
+          headers: authHeaders,
+        });
+        
+        if (response.status === 401) {
+          logoutHost();
+          return;
+        }
+
+        if (response.ok) {
+          const data: IceBreaker = await response.json();
+          setIceBreakerData(data);
+        }
+      } catch (err) {
+        console.error("Error cargando respuestas de icebreaker", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [game?.code, hostToken, showIceBreaker, logoutHost]);
 
   if (!hostToken) {
     return (
@@ -833,6 +910,7 @@ export default function Host() {
 
             </div>
 
+
             <div
               className="
                 flex
@@ -883,6 +961,86 @@ export default function Host() {
           </div>
         )}
 
+
+
+        {showIceBreaker && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-3xl rounded-3xl bg-slate-900 p-8 shadow-2xl border border-white/10 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-3xl font-extrabold text-pink-400 flex items-center gap-2">
+                  ⏳ Chismesito time 
+                </h2>
+                <button
+                  onClick={() => setShowIceBreaker(false)}
+                  className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-2"
+                >
+                  Ocultar Ventana
+                </button>
+              </div>
+
+              {!iceBreakerData?.active ? (
+                <div className="space-y-4">
+                  <p className="text-slate-300">
+                    Escribe una pregunta abierta para lanzar a los alumnos mientras esperan a que empiece la trivia oficial.
+                  </p>
+                  <textarea
+                    value={iceBreakerQuestion}
+                    onChange={(e) => setIceBreakerQuestion(e.target.value)}
+                    placeholder="Ej: ¿Como pides tu elote?"
+                    className="w-full min-h-24 rounded-xl bg-white/5 border border-white/20 p-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-pink-500"
+                  />
+                  <button
+                    onClick={startIcebreakerHost}
+                    disabled={!iceBreakerQuestion || !game}
+                    className="w-full p-4 rounded-xl bg-pink-600 hover:bg-pink-500 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    🚀 Lanzar Pregunta 
+                  </button>
+                </div>
+              ) : (
+                /* FASE 2: Mostrar respuestas recibidas en tiempo real */
+                <div className="space-y-6">
+                  <div className="bg-black/30 p-4 rounded-2xl border border-pink-500/20">
+                    <span className="text-xs text-pink-400 uppercase tracking-wider font-bold">Pregunta actual:</span>
+                    <h3 className="text-2xl font-bold mt-1 text-white">{iceBreakerData.question}</h3>
+                  </div>
+
+                  <div>
+                    <h4 className="text-lg font-semibold mb-3 text-slate-300">
+                      Respuestas Recibidas ({iceBreakerData.answers.length})
+                    </h4>
+                    
+                    <div className="grid md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2">
+                      {iceBreakerData.answers.map((ans) => (
+                        <div key={ans.id} className="bg-white/5 border border-white/10 rounded-xl p-4 shadow-sm">
+                          <p className="text-white mb-2 italic">"{ans.text}"</p>
+                          <span className="text-xs text-fuchsia-400 font-semibold">👤 {ans.playerName}</span>
+                        </div>
+                      ))}
+                      {iceBreakerData.answers.length === 0 && (
+                        <p className="text-slate-500 col-span-2 text-center py-4">Esperando respuestas de los alumnos...</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={closeIcebreakerHost}
+                    className="w-full p-4 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-white transition-all shadow-lg"
+                  >
+                    🛑 Cerrar Rompehielos e ir a por la victoria
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+        
+
+
         <div
           className="
             grid
@@ -923,6 +1081,24 @@ export default function Host() {
             >
               Crear Juego
             </button>
+
+           <button
+            onClick={() => {
+              setShowIceBreaker(true);
+              setIceBreakerData(null);
+            }}
+            className="
+              w-full
+              bg-pink-600
+               mb-3
+              p-3
+              text-white
+              font-bold
+              rounded-xl
+            "
+          >
+            🍦 Ice Breaker
+          </button>
 
             <button
               onClick={startGame}
@@ -1293,6 +1469,11 @@ export default function Host() {
           </div>
         </div>
       </div>
+
+      
     </div>
   );
+
+
+  
 }

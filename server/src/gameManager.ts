@@ -118,25 +118,26 @@ function generateCode() {
   )}`;
 }
 
-export function joinGame(
-  code: string,
-  playerName: string
-) {
+export function joinGame(code: string, playerName: string) {
   const game = games.get(code);
 
   if (!game) {
     return null;
   }
 
-  game.players.push({
-    id: crypto.randomUUID(),
-    name: playerName,
-    score: 0,
-  });
+  // Evitar duplicar el jugador si refresca la pantalla
+  const existingPlayer = game.players.find(p => p.name === playerName);
+  
+  if (!existingPlayer) {
+    game.players.push({
+      id: crypto.randomUUID(),
+      name: playerName,
+      score: 0,
+    });
+  }
 
-  return game;
+  return game; // ¡Asegúrate de retornar todo el objeto game completo aquí!
 }
-
 export function startGame(code: string) {
   const game = games.get(code);
 
