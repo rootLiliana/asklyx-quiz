@@ -10,45 +10,44 @@ export default function Join() {
   const navigate = useNavigate();
 
   const joinGame = async () => {
-    const response = await fetch(
-      `${API}/games/${code}/join`,
-      {
+    try {
+      const response = await fetch(`${API}/games/${code}/join`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name,
-        }),
+        body: JSON.stringify({ name }), // Tu backend recibe { name }
+      });
+
+      if (!response.ok) {
+        alert("No se pudo unir al juego. Revisa el código.");
+        return;
       }
-    );
 
-    const game: Game =
-  await response.json();
+      const game: Game = await response.json();
 
-          const player =
-        game.players.find(
-          p => p.name === name
-        );
-
-        if (!player) {
-          return;
-        }
-
-
-      localStorage.setItem(
-      "playerId",
-      player.id
-    );
-
-      localStorage.setItem(
-        "gameCode",
-        game.code
+      const player = game.players.find(
+        (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
       );
 
+      if (!player) {
+        alert("Error al registrar tu jugador.");
+        return;
+      }
 
-    console.log(game);
-    navigate("/quiz");
+      // Guardamos en LocalStorage
+      localStorage.setItem("playerId", player.id);
+      localStorage.setItem("playerName", player.name);
+      localStorage.setItem("gameCode", game.code);
+
+      console.log("Juego unido con éxito:", game);
+
+      // REDIRECCIÓN: Forzamos la ida a la ruta /iceBreaker
+      navigate("/iceBreaker");
+      
+    } catch (error) {
+      console.error("Error al unirse:", error);
+    }
   };
 
   return (
