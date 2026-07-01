@@ -193,15 +193,22 @@ export default function Quiz() {
     const data: SubmitAnswerResponse =
       await response.json();
 
-    setResult(
-      data.correct
-        ? "✅ Correcto"
-        : "❌ Incorrecto"
-    );
 
-    setAnswered(true);
-    setCorrectAnswer(data.correctAnswer);
-    setExplanation(data.explanation);
+      if (data.alreadyAnswered) {
+        setResult("⚠️ Ya habías respondido esta pregunta.");
+      } else {
+        setResult(
+          data.correct
+            ? "✅ Correcto"
+            : "❌ Incorrecto"
+        );
+      }
+
+      setAnswered(true);
+      setCorrectAnswer(data.correctAnswer);
+      setExplanation(data.explanation);
+
+  
   };
 
   if (!code) {
