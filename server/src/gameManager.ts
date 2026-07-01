@@ -99,7 +99,7 @@ export function createGame() {
 
   const code = generateCode();
 
- const game = {
+  const game: Game = { 
   code,
   players: [],
   questions,
@@ -113,7 +113,7 @@ export function createGame() {
 }
 
 function generateCode() {
-  return `BEDU-${Math.floor(
+  return `ANA-${Math.floor(
     1000 + Math.random() * 9000
   )}`;
 }
@@ -133,11 +133,18 @@ export function joinGame(code: string, playerName: string) {
       id: crypto.randomUUID(),
       name: playerName,
       score: 0,
+      answeredQuestions: []
+
     });
+
+    
   }
 
+  
   return game; // ¡Asegúrate de retornar todo el objeto game completo aquí!
 }
+
+
 export function startGame(code: string) {
   const game = games.get(code);
 
@@ -212,38 +219,55 @@ export function submitAnswer(
   if (!player) {
     return null;
   }
-
   const question =
-    game.questions[game.currentQuestion];
+  game.questions[game.currentQuestion];
 
-  if (!question) {
-    return null;
-  }
-
-  const isCorrect =
-    answer === question.correctAnswer;
-
-  if (isCorrect) {
-    const safeTimeLeft = Math.max(
-      0,
-      Math.min(
-        Math.ceil(timeLeft),
-        game.questionDurationSeconds
-      )
-    );
-
-    console.log("timeLeft:", safeTimeLeft);
-    player.score += safeTimeLeft * 100;
-  }
-
-    return {
-      correct: isCorrect,
-      score: player.score,
-      correctAnswer: question.correctAnswer,
-      explanation: question.explanation,
-    };
+if (!question) {
+  return null;
 }
 
+const alreadyAnswered =
+  player.answeredQuestions.includes(
+    question.id
+  );
+
+  if (alreadyAnswered) {
+  return {
+    correct: false,
+    alreadyAnswered: true,
+    score: player.score,
+    correctAnswer: question.correctAnswer,
+    explanation: question.explanation,
+  };
+}
+
+player.answeredQuestions.push(
+  question.id
+);
+
+
+const isCorrect =
+  answer === question.correctAnswer;
+
+if (isCorrect) {
+  const safeTimeLeft = Math.max(
+    0,
+    Math.min(
+      Math.ceil(timeLeft),
+      game.questionDurationSeconds
+    )
+  );
+
+  player.score += safeTimeLeft * 100;
+}
+
+return {
+  correct: isCorrect,
+  score: player.score,
+  correctAnswer: question.correctAnswer,
+  explanation: question.explanation,
+};
+}
 
 export function nextQuestion(code: string) {
   const game = games.get(code);
