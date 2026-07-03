@@ -10,6 +10,9 @@ import type { Question } from "../types/Question";
 import { API } from "../config/api";
 import { motion } from "framer-motion";
 import type { IceBreaker } from "../types/IceBreaker";
+import QRCode from "react-qr-code";
+import { useSearchParams } from "react-router-dom";
+
 
 const QUESTION_DURATION_SECONDS = 15;
 const EMPTY_QUESTION: Question = {
@@ -23,6 +26,12 @@ const EMPTY_QUESTION: Question = {
 export default function Host() {
   const [game, setGame] =
     useState<Game | null>(null);
+
+    const [codeCopied, setCodeCopied] =
+  useState(false);
+
+const [linkCopied, setLinkCopied] =
+  useState(false);
 
   const [timeLeft, setTimeLeft] =
     useState(QUESTION_DURATION_SECONDS);
@@ -61,11 +70,22 @@ export default function Host() {
 const [iceBreakerQuestion, setIceBreakerQuestion] =
   useState("");
 
+  const [showQrModal, setShowQrModal] =
+  useState(false);
+
 const [iceBreakerData, setIceBreakerData] =
   useState<IceBreaker | null>(null);
 
   const currentQuestionIndex =
     useRef<number | null>(null);
+
+
+    const joinUrl = game
+      ? `${window.location.origin}/join?code=${game.code}`
+      : "";
+
+     const gameCode =
+  game?.code ?? ""; 
 
   const authHeaders = {
     Authorization: `Bearer ${hostToken}`,
@@ -76,6 +96,8 @@ const [iceBreakerData, setIceBreakerData] =
     setHostToken("");
     setGame(null);
   }, []);
+
+
 
   const applyGameUpdate = useCallback(
     (updatedGame: Game) => {
@@ -405,7 +427,6 @@ const startIcebreakerHost = async () => {
   };
 
   useEffect(() => {
-    const gameCode = game?.code;
 
     if (!gameCode || !hostToken) return;
 
@@ -474,6 +495,8 @@ const startIcebreakerHost = async () => {
     timeLeft,
   ]);
 
+
+  
   const currentQuestion =
     game?.questions?.[
       game.currentQuestion
@@ -486,6 +509,7 @@ const startIcebreakerHost = async () => {
 
   const visibleRanking =
     liveRanking;
+    
 
   
     useEffect(() => {
@@ -512,8 +536,12 @@ const startIcebreakerHost = async () => {
       }
     }, 2000);
 
+    
+
     return () => clearInterval(interval);
   }, [game?.code, hostToken, showIceBreaker, logoutHost]);
+
+  
 
   if (!hostToken) {
     return (
@@ -1157,15 +1185,91 @@ const startIcebreakerHost = async () => {
                   Código
                 </h3>
 
+               <div
+                className="
+                  mt-8
+                  flex
+                  flex-col
+                  items-center
+                  gap-4
+                "
+              >
+                            <div
+                onClick={() =>
+                  setShowQrModal(true)
+                }
+                className="
+                  bg-white
+                  p-4
+                  rounded-2xl
+                  shadow-xl
+
+                  cursor-zoom-in
+
+                  hover:scale-105
+                  hover:shadow-2xl
+
+                  transition-all
+                  duration-300
+                "
+              >
+                <QRCode
+                  value={joinUrl}
+                  size={180}
+                />
+
                 <p
                   className="
-                    text-4xl
-                    font-bold
-                    text-fuchsia-300
+                    mt-3
+                    text-center
+                    text-gray-600
+                    text-sm
+                    font-semibold
                   "
                 >
+                  🔍 Click para ampliar
+                </p>
+              </div>
+
+
+                  <button
+                    onClick={() =>
+                      navigator.clipboard.writeText(joinUrl)
+                    }
+                    className="
+                      bg-fuchsia-600
+                      px-4
+                      py-2
+                      rounded-xl
+                      text-white
+                    "
+                  >
+                    📋 Copiar enlace
+                  </button>
+
+                  <button
+                    onClick={() =>
+                    navigator.clipboard.writeText(game.code)
+                    }
+                    className="
+                      bg-fuchsia-600
+                      px-4
+                      py-2
+                      rounded-xl
+                      text-white
+                    "
+                  >
+                   🔢 Copiar código
+                  </button>
+
+                <p className="text-white text-lg font-semibold">
+                  📱 Escanea para unirte
+                </p>
+
+                <p className="text-fuchsia-300 font-bold">
                   {game.code}
                 </p>
+              </div>
 
                 <p
                   className="
@@ -1282,23 +1386,40 @@ const startIcebreakerHost = async () => {
                     gap-3
                   "
                 >
-                  {currentQuestion.options.map(
-                    (
-                      option,
-                      index
-                    ) => (
-                      <div
+                {currentQuestion.options.map(
+                    (option, index) => (
+                      <button
                         key={index}
-                        className="
-                          bg-purple-800/50
-                          border
-                          border-purple-400/30
-                          p-4
-                          rounded-xl
-                        "
+                        className={`
+                          p-6
+                          rounded-2xl
+                          text-white
+                          text-xl
+                          font-bold
+                          shadow-xl
+                          transition-all
+
+                          ${
+                            showExplanation &&
+                            index === currentQuestion.correctAnswer
+                              ? `
+                                bg-gradient-to-r
+                                from-green-500
+                                to-emerald-600
+                                ring-4
+                                ring-green-300
+                                scale-105
+                              `
+                              : `
+                                bg-gradient-to-r
+                                from-fuchsia-500
+                                to-purple-600
+                              `
+                          }
+                        `}
                       >
                         {option}
-                      </div>
+                      </button>
                     )
                   )}
                 </div>
@@ -1466,11 +1587,199 @@ const startIcebreakerHost = async () => {
                 entren jugadoras.
               </p>
             )}
-          </div>
-        </div>
-      </div>
 
-      
+
+            
+          </div>
+
+           
+          
+        </div>
+
+                {showQrModal && (
+
+<div
+className="
+fixed
+inset-0
+bg-black/70
+backdrop-blur-sm
+flex
+items-center
+justify-center
+z-50
+"
+>
+
+  <div
+  className="
+flex
+flex-col
+items-center
+justify-center
+  bg-slate-900/90
+  rounded-[40px]
+  p-10
+  max-w-3xl
+  w-full
+  "
+  >
+<button
+  onClick={() =>
+    setShowQrModal(false)
+  }
+  className="
+    absolute
+    top-5
+    right-5
+
+    w-12
+    h-12
+
+    rounded-full
+
+    bg-white/10
+    backdrop-blur
+
+    text-white
+    text-2xl
+    font-bold
+
+    hover:bg-fuchsia-500
+    hover:rotate-90
+    hover:scale-110
+
+    transition-all
+    duration-300
+  "
+>
+  ✕
+</button>
+
+    <h2>
+
+🚀 Únete a Lilihoot
+
+</h2>
+
+   <div>
+
+<QRCode
+value={joinUrl}
+
+size={300}
+/>
+
+</div>
+
+    <p>
+
+📱 Escanea con la cámara de tu celular
+
+</p>
+
+    <div
+  className="
+    mt-10
+    flex
+    flex-col
+    md:flex-row
+    justify-center
+    gap-4
+  "
+>
+  <button
+  onClick={() => {
+
+  if (!gameCode) return;
+
+  navigator.clipboard.writeText(gameCode);
+
+  setCodeCopied(true);
+
+  setTimeout(() => {
+    setCodeCopied(false);
+  }, 2000);
+
+}}
+    className="
+      px-6
+      py-4
+
+      rounded-2xl
+
+      bg-gradient-to-r
+      from-indigo-600
+      to-indigo-500
+
+      text-white
+      font-bold
+      text-lg
+
+      shadow-xl
+
+      hover:scale-105
+      hover:shadow-2xl
+
+      transition-all
+      duration-300
+    "
+  >
+   {codeCopied
+  ? "✅ Código copiado"
+  : "🔢 Copiar código"}
+  </button>
+
+  <button
+    onClick={() => {
+  navigator.clipboard.writeText(joinUrl);
+  setLinkCopied(true);
+
+  setTimeout(() => {
+    setLinkCopied(false);
+  }, 2000);
+}}
+    
+    className="
+      px-6
+      py-4
+
+      rounded-2xl
+
+      bg-gradient-to-r
+      from-fuchsia-600
+      to-purple-600
+
+      text-white
+      font-bold
+      text-lg
+
+      shadow-xl
+
+      hover:scale-105
+      hover:shadow-2xl
+
+      transition-all
+      duration-300
+    "
+  >
+    {linkCopied
+  ? "✅ Enlace copiado"
+  : "📋 Copiar enlace"}
+  </button>
+</div>
+
+  </div>
+
+</div>
+
+)
+
+}
+      </div>      
+
+
+
     </div>
   );
 

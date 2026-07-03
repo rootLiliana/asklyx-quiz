@@ -1,13 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Game } from "../types/Game";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { API } from "../config/api";
+import { useSearchParams } from "react-router-dom";
 
 export default function Join() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [searchParams] =
+  useSearchParams();
+
   const navigate = useNavigate();
+
+
+  useEffect(() => {
+
+  const urlCode =
+    searchParams.get("code");
+
+  if (urlCode) {
+    setCode(urlCode);
+  }
+
+}, [searchParams]);
 
   const joinGame = async () => {
     try {
@@ -257,6 +273,8 @@ export default function Join() {
         onChange={(e) =>
           setCode(e.target.value)
         }
+
+        disabled={!!searchParams.get("code")}
       />
 
       <button
