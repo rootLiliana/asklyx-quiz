@@ -12,12 +12,13 @@ import type { SubmitAnswerResponse } from "../types/SubmitAnswerResponse";
 import type { QuestionResponse } from "../types/QuestionResponse";
 import { useNavigate } from "react-router-dom";
 
+export default function Quiz() {
 const navigate =
 useNavigate();
 
 const QUESTION_DURATION_SECONDS = 15;
 
-export default function Quiz() {
+
   const [question, setQuestion] =
     useState<Question | null>(null);
 

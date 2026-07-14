@@ -12,6 +12,7 @@ import type { Player } from "../types/Player";
 
 import { motion } from "framer-motion";
 
+export default function Podium() {
 
   const [leaderboard, setLeaderboard] =
     useState<Player[]>([]); 
@@ -49,7 +50,6 @@ useEffect(() => {
 void loadLeaderboard();
 
 }, [loadLeaderboard]);
-export default function Podium() {
 
       return (
       <>
