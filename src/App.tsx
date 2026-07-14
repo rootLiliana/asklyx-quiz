@@ -5,6 +5,7 @@ import Host from "./pages/Host";
 import Join from "./pages/Join";
 import Quiz from "./pages/Quiz";
 import IceBreaker from "./pages/IceBreaker";
+import  Podium  from "./pages/Podium";
 
 function App() {
   return (
@@ -19,6 +20,8 @@ function App() {
         <Route path="/quiz" element={<Quiz />} />
 
         <Route path="/icebreaker" element={<IceBreaker />} />
+
+        <Route path="/podium" element={<Podium />} />
       </Routes>
     </BrowserRouter>
   );
