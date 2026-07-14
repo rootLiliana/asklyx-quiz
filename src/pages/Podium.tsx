@@ -16,7 +16,7 @@ import { motion } from "framer-motion";
   const [leaderboard, setLeaderboard] =
     useState<Player[]>([]); 
 
-const [windowSize, setWindowSize] =
+const [windowSize] =
 useState({
   width: window.innerWidth,
   height: window.innerHeight,

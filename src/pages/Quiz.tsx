@@ -8,7 +8,6 @@ import { motion } from "framer-motion";
 import type { Question } from "../types/Question";
 import type { Player } from "../types/Player";
 import { API } from "../config/api";
-import Confetti from "react-confetti";
 import type { SubmitAnswerResponse } from "../types/SubmitAnswerResponse";
 import type { QuestionResponse } from "../types/QuestionResponse";
 import { useNavigate } from "react-router-dom";
@@ -43,8 +42,6 @@ export default function Quiz() {
   const [answered, setAnswered] =
     useState(false);
 
-  const [leaderboard, setLeaderboard] =
-    useState<Player[]>([]);
 
   const code =
     localStorage.getItem("gameCode");
@@ -64,7 +61,7 @@ export default function Quiz() {
         await response.json();
 
       console.log("Leaderboard:", data);
-      setLeaderboard(data);
+      // setLeaderboard(data);
     }, [code]);
 
   const loadQuestion = useCallback(async () => {
@@ -108,11 +105,6 @@ export default function Quiz() {
     setQuestion(data);
   }, [code, loadLeaderboard]);
 
-  const [windowSize, setWindowSize] =
-    useState({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
 
   useEffect(() => {
     const firstLoad = setTimeout(() => {
@@ -147,25 +139,6 @@ export default function Quiz() {
       clearTimeout(timer);
   }, [timeLeft, answered]);
 
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
-    window.addEventListener(
-      "resize",
-      handleResize
-    );
-
-    return () =>
-      window.removeEventListener(
-        "resize",
-        handleResize
-      );
-  }, []);
 
   const submitAnswer = async (
     answer: number
