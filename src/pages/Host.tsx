@@ -11,7 +11,6 @@ import { API } from "../config/api";
 import { motion } from "framer-motion";
 import type { IceBreaker } from "../types/IceBreaker";
 import QRCode from "react-qr-code";
-import { useSearchParams } from "react-router-dom";
 
 
 const QUESTION_DURATION_SECONDS = 15;
