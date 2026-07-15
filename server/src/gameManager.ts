@@ -18,7 +18,9 @@ const defaultQuestions: Question[] = [
       "Eliminan automáticamente los valores nulos."
     ],
     "correctAnswer": 1,
-    "explanation": "Las funciones vectorizadas aplican una operación a todos los elementos de una Serie o DataFrame de manera optimizada, evitando recorrer los datos elemento por elemento."
+    "explanation": "Las funciones vectorizadas aplican una operación a todos los elementos de una Serie o DataFrame de manera optimizada, evitando recorrer los datos elemento por elemento.",
+     
+  answers: [0, 0, 0, 0]
   },
   {
     "id": "2",
@@ -30,7 +32,9 @@ const defaultQuestions: Question[] = [
       "astype()"
     ],
     "correctAnswer": 2,
-    "explanation": "Las funciones de agregación resumen varios valores en uno solo. mean() calcula el promedio de los datos."
+    "explanation": "Las funciones de agregación resumen varios valores en uno solo. mean() calcula el promedio de los datos.",
+     
+  answers: [0, 0, 0, 0]
   },
   {
     "id": "3",
@@ -42,7 +46,9 @@ const defaultQuestions: Question[] = [
       "Solo permite la operación si ambos DataFrames tienen el mismo tamaño."
     ],
     "correctAnswer": 2,
-    "explanation": "Pandas alinea automáticamente las filas y columnas por sus etiquetas antes de realizar operaciones entre DataFrames."
+    "explanation": "Pandas alinea automáticamente las filas y columnas por sus etiquetas antes de realizar operaciones entre DataFrames.",
+     
+  answers: [0, 0, 0, 0]
   },
   {
     "id": "4",
@@ -54,7 +60,9 @@ const defaultQuestions: Question[] = [
       "Elimina únicamente los registros duplicados."
     ],
     "correctAnswer": 2,
-    "explanation": "Con how='any', cualquier fila que contenga al menos un valor faltante (NaN) será eliminada."
+    "explanation": "Con how='any', cualquier fila que contenga al menos un valor faltante (NaN) será eliminada.",
+     
+  answers: [0, 0, 0, 0]
   },
   {
     "id": "5",
@@ -66,14 +74,20 @@ const defaultQuestions: Question[] = [
       "Ordenar las columnas alfabéticamente."
     ],
     "correctAnswer": 1,
-    "explanation": "Utilizar snake_case hace que los nombres de las columnas sean más consistentes y fáciles de utilizar en el código."
+    "explanation": "Utilizar snake_case hace que los nombres de las columnas sean más consistentes y fáciles de utilizar en el código.",
+   
+  answers: [0, 0, 0, 0]
   }
+ 
 ];
 
-function cloneQuestions(questions: Question[]) {
-  return questions.map((question) => ({
+function cloneQuestions(
+  questions: Question[]
+) {
+  return questions.map(question => ({
     ...question,
     options: [...question.options],
+    answers: [...question.answers],
   }));
 }
 
@@ -88,7 +102,14 @@ export function setConfiguredQuestions(
   questions: Question[]
 ) {
   configuredQuestions =
-    cloneQuestions(questions);
+    questions.map(question => ({
+      ...question,
+      options: [...question.options],
+
+      answers:
+        question.answers ??
+        new Array(question.options.length).fill(0),
+    }));
 
   return getConfiguredQuestions();
 }
@@ -231,7 +252,7 @@ const alreadyAnswered =
     question.id
   );
 
-  if (alreadyAnswered) {
+if (alreadyAnswered) {
   return {
     correct: false,
     alreadyAnswered: true,
@@ -245,6 +266,14 @@ player.answeredQuestions.push(
   question.id
 );
 
+// ✅ Contamos la respuesta UNA sola vez
+if (
+  answer >= 0 &&
+  answer < question.answers.length &&
+  question.answers[answer] !== undefined
+) {
+  question.answers[answer]++;
+}
 
 const isCorrect =
   answer === question.correctAnswer;
@@ -267,6 +296,7 @@ return {
   correctAnswer: question.correctAnswer,
   explanation: question.explanation,
 };
+
 }
 
 export function nextQuestion(code: string) {
@@ -349,4 +379,62 @@ export function closeIcebreaker(code: string) {
 
   game.icebreaker.active = false;
   return game.icebreaker;
+}
+
+export function getGameStats(
+  code: string
+){
+
+  const game = games.get(code);
+
+if (!game) {
+  return null;
+}
+
+return game.questions.map(question => {
+const total =
+question.answers.reduce(
+  (sum, value) => sum + value,
+  0
+);
+
+const correct =
+  question.answers[
+    question.correctAnswer
+  ] ?? 0;
+
+const incorrect =
+total - correct;
+
+const percentage =
+total === 0
+? 0
+: Math.round(
+(correct / total) * 100
+);
+return {
+
+ id: question.id,
+
+  text: question.text,
+
+  options: [...question.options],
+
+  answers: [...question.answers],
+
+  correctAnswer:
+    question.correctAnswer,
+
+  correct,
+
+  incorrect,
+
+  total,
+
+  percentage,
+
+};
+});
+
+
 }
