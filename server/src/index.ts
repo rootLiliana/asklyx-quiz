@@ -19,7 +19,8 @@ import { createGame,
   startIcebreaker, 
   getIcebreaker, 
   submitIcebreakerAnswer, 
-  closeIcebreaker
+  closeIcebreaker,
+  getGameStats
  } from "./gameManager.js";
 import { loadEnvFile } from "./env.js";
 import type { Question } from "./types/Question.js";
@@ -220,6 +221,12 @@ app.post(
             question.correctAnswer,
             explanation:
           question.explanation.trim(),
+
+           answers:
+      new Array(
+        question.options.length
+      ).fill(0),
+      
         })
       );
 
@@ -413,3 +420,20 @@ app.put("/games/:code/icebreaker/close", (req, res) => {
 
   res.json({ message: "Icebreaker closed successfully", icebreaker });
 });
+
+app.get(
+  "/games/:code/stats",
+  (req, res) => {
+
+    const stats =
+      getGameStats(req.params.code);
+
+    if (!stats) {
+      return res.status(404).json({
+        message: "Game not found",
+      });
+    }
+
+    res.json(stats);
+  }
+);
