@@ -27,3 +27,4 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+migrations/

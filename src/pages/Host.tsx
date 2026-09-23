@@ -18,6 +18,23 @@ interface QuestionStat {
   percentage: number;
 }
 
+interface ClassSummary {
+  id: string;
+  name: string;
+  moduleId: string;
+  groupId: string;
+}
+
+interface GroupSummary {
+  id: string;
+  name: string;
+}
+
+interface SavedQuiz {
+  id: string;
+  groupId: string;
+}
+
 const QUESTION_DURATION_SECONDS = 15;
 const EMPTY_QUESTION: Question = {
   id: "",
@@ -44,7 +61,17 @@ export default function Host() {
   const [iceBreakerQuestion, setIceBreakerQuestion] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [iceBreakerData, setIceBreakerData] = useState<IceBreaker | null>(null);
-  
+
+  // Persistencia del quiz configurado (Fase 3A): la HOST elige una clase real
+  // ya existente; el quiz queda guardado en quizzes/questions/options.
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [groupNameById, setGroupNameById] = useState<Record<string, string>>({});
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [quizTitle, setQuizTitle] = useState("");
+  const [classesError, setClassesError] = useState("");
+  const [savedQuiz, setSavedQuiz] = useState<SavedQuiz | null>(null);
+  const [createGameError, setCreateGameError] = useState("");
+
   // Estado para las estadísticas
   const [stats, setStats] = useState<QuestionStat[]>([]);
 
@@ -88,8 +115,23 @@ export default function Host() {
   };
 
   const createGame = async () => {
-    const response = await fetch(`${API}/games`, { method: "POST", headers: authHeaders });
+    setCreateGameError("");
+
+    // Si hay un quiz recién guardado en BD, lo usamos (quizId + groupId de su
+    // clase); si no, se mantiene el flujo legado sin body tal como hoy.
+    const response = await fetch(`${API}/games`, {
+      method: "POST",
+      headers: savedQuiz ? { ...authHeaders, "Content-Type": "application/json" } : authHeaders,
+      ...(savedQuiz ? { body: JSON.stringify({ quizId: savedQuiz.id, groupId: savedQuiz.groupId }) } : {}),
+    });
+
     if (response.status === 401) { logoutHost(); return; }
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      setCreateGameError(errorBody?.message ?? "No pudimos crear el juego. Intenta nuevamente.");
+      return;
+    }
+
     const createdGame = await response.json();
     applyGameUpdate(createdGame);
   };
@@ -119,28 +161,86 @@ export default function Host() {
     setQuestionsDraft(data);
   };
 
+  const loadClasses = async () => {
+    setClassesError("");
+    try {
+      const [classesResponse, groupsResponse] = await Promise.all([
+        fetch(`${API}/classes`),
+        fetch(`${API}/groups`),
+      ]);
+
+      if (!classesResponse.ok || !groupsResponse.ok) {
+        setClassesError("No pudimos cargar las clases disponibles.");
+        return;
+      }
+
+      const classesData: ClassSummary[] = await classesResponse.json();
+      const groupsData: GroupSummary[] = await groupsResponse.json();
+
+      setClasses(classesData);
+      setGroupNameById(Object.fromEntries(groupsData.map((group) => [group.id, group.name])));
+    } catch (err) {
+      console.error("Error cargando clases", err);
+      setClassesError("No pudimos cargar las clases disponibles.");
+    }
+  };
+
   const openQuizConfig = async () => {
     setConfigOpen(true);
-    await loadQuestions();
+    await Promise.all([loadQuestions(), loadClasses()]);
   };
 
   const saveQuestions = async () => {
     setConfigMessage("");
-    const response = await fetch(`${API}/host/questions`, {
+
+    if (!quizTitle.trim()) {
+      setConfigMessage("Escribe un título para el quiz.");
+      return;
+    }
+
+    const selectedClass = classes.find((classItem) => classItem.id === selectedClassId);
+    if (!selectedClass) {
+      setConfigMessage("Selecciona la clase a la que pertenece este quiz.");
+      return;
+    }
+
+    // 1) Persistimos el quiz en la base de datos (quizzes/questions/options).
+    const persistResponse = await fetch(`${API}/host/quizzes`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        classId: selectedClass.id,
+        title: quizTitle,
+        questions: questionsDraft,
+      }),
+    });
+
+    if (persistResponse.status === 401) { logoutHost(); return; }
+    if (!persistResponse.ok) {
+      setConfigMessage("No pudimos guardar el quiz. Revisa que cada pregunta tenga texto, al menos dos opciones y una respuesta correcta.");
+      return;
+    }
+
+    const savedQuizContent: { id: string } = await persistResponse.json();
+
+    // 2) Mantenemos el puente actual con el Game Manager (sin tocarlo) para
+    // que el juego en vivo siga usando estas preguntas, igual que hoy.
+    const bridgeResponse = await fetch(`${API}/host/questions`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({ questions: questionsDraft }),
     });
 
-    if (response.status === 401) { logoutHost(); return; }
-    if (!response.ok) {
-      setConfigMessage("Revisa que cada pregunta tenga texto, al menos dos opciones y una respuesta correcta.");
+    if (bridgeResponse.status === 401) { logoutHost(); return; }
+    if (!bridgeResponse.ok) {
+      setConfigMessage("El quiz se guardó en la base de datos, pero no se pudo sincronizar con el juego en memoria. Intenta guardar de nuevo.");
       return;
     }
 
-    const savedQuestions: Question[] = await response.json();
+    const savedQuestions: Question[] = await bridgeResponse.json();
     setQuestionsDraft(savedQuestions);
-    setConfigMessage("Quiz guardado. El próximo juego usará estas preguntas.");
+    setSavedQuiz({ id: savedQuizContent.id, groupId: selectedClass.groupId });
+    setConfigMessage("Quiz guardado en la base de datos. El próximo juego usará este quiz.");
   };
 
   // Función para cargar estadísticas obtenida de tu consulta
@@ -321,6 +421,35 @@ export default function Host() {
                 </button>
               </div>
 
+              <div className="grid gap-4 md:grid-cols-2 mb-6">
+                <div>
+                  <label className="block text-sm text-slate-300 mb-2">Título del quiz</label>
+                  <input
+                    value={quizTitle}
+                    onChange={(e) => setQuizTitle(e.target.value)}
+                    placeholder="Ej: Pandas - Módulo 1"
+                    className="w-full rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-300 mb-2">Clase</label>
+                  <select
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    className="w-full rounded-xl bg-white/10 border border-white/20 p-3 text-white"
+                  >
+                    <option value="" className="text-black">Selecciona una clase...</option>
+                    {classes.map((classItem) => (
+                      <option key={classItem.id} value={classItem.id} className="text-black">
+                        {classItem.name} — {groupNameById[classItem.groupId] ?? `Grupo ${classItem.groupId}`} (Módulo {classItem.moduleId})
+                      </option>
+                    ))}
+                  </select>
+                  {classesError && <p className="mt-2 text-sm text-red-300">{classesError}</p>}
+                </div>
+              </div>
+
               <div className="grid gap-5">
                 {questionsDraft.map((question, questionIndex) => (
                   <div key={question.id || questionIndex} className="rounded-2xl bg-black/20 p-5">
@@ -371,7 +500,11 @@ export default function Host() {
                 <button onClick={addQuestion} className="rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3">
                   Agregar Pregunta
                 </button>
-                <button onClick={saveQuestions} className="rounded-xl bg-green-600 hover:bg-green-500 px-4 py-3 font-bold">
+                <button
+                  onClick={saveQuestions}
+                  disabled={!quizTitle.trim() || !selectedClassId}
+                  className="rounded-xl bg-green-600 hover:bg-green-500 px-4 py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Guardar Quiz
                 </button>
               </div>
@@ -443,9 +576,13 @@ export default function Host() {
           {/* COLUMNA 1: Panel Control de la Sala */}
           <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6">
             <h2 className="text-2xl mb-4">Sala</h2>
+            {savedQuiz && (
+              <p className="text-xs text-emerald-300 mb-2">✓ Se usará el último quiz guardado</p>
+            )}
             <button onClick={createGame} className="w-full mb-3 p-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500">
               Crear Juego
             </button>
+            {createGameError && <p className="text-xs text-red-300 mb-3">{createGameError}</p>}
             <button onClick={() => { setShowIceBreaker(true); setIceBreakerData(null); }} className="w-full bg-pink-600 mb-3 p-3 text-white font-bold rounded-xl">
               🍦 Ice Breaker
             </button>

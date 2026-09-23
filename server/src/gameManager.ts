@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { Game, IceBreaker } from "./types/Game.js";
 import type { Player } from "./types/Player.js";
 import type { Question } from "./types/Question.js";
@@ -114,9 +115,12 @@ export function setConfiguredQuestions(
   return getConfiguredQuestions();
 }
 
-export function createGame() {
-  const questions =
-    getConfiguredQuestions();
+export function createGame(
+  suppliedQuestions?: Question[],
+) {
+  const questions = suppliedQuestions
+    ? cloneQuestions(suppliedQuestions)
+    : getConfiguredQuestions();
 
   const code = generateCode();
 
@@ -329,6 +333,10 @@ export function getLeaderboard(
 
 export function getGame(code: string) {
   return games.get(code);
+}
+
+export function deleteGame(code: string): void {
+  games.delete(code);
 }
 
 // 1. Activa el icebreaker en el juego con una pregunta inicial
