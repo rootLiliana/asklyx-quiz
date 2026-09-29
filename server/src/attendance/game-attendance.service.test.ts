@@ -16,7 +16,7 @@ import type { UserRepository } from "../users/user.repository.js";
 import type { User, UserRole, UserWithPasswordHash } from "../users/user.types.js";
 import { AttendanceService } from "./attendance.service.js";
 import type { AttendanceRepository } from "./attendance.repository.js";
-import type { AttendanceRecord, AttendanceStatus, ClassAttendanceEntry, StudentAttendanceEntry } from "./attendance.types.js";
+import type { AttendanceRecord, AttendanceStatus, ClassAttendanceEntry, GroupAttendanceMatrix, StudentAttendanceEntry } from "./attendance.types.js";
 import { GameAttendanceService } from "./game-attendance.service.js";
 
 const existingClass: ClassItem = {
@@ -154,6 +154,7 @@ class FakeAttendanceRepository implements AttendanceRepository {
 
   async findRosterForClass(): Promise<ClassAttendanceEntry[]> { return []; }
   async findByStudent(): Promise<StudentAttendanceEntry[]> { return []; }
+  async findMatrixForGroup(): Promise<GroupAttendanceMatrix> { return { classes: [], students: [], records: [] }; }
 }
 
 function buildServices() {

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { Game, IceBreaker } from "./types/Game.js";
+import type { Game } from "./types/Game.js";
 import type { Player } from "./types/Player.js";
 import type { Question } from "./types/Question.js";
 
@@ -44,50 +44,70 @@ function generateCode() {
   )}`;
 }
 
+// Normaliza lo que teclea el alumno ("ana-1234 " -> "ANA-1234").
+export function normalizeGameCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
+function findGame(code: string): Game | undefined {
+  return games.get(normalizeGameCode(code));
+}
+
+// Se permite contestar un poco después de que el cronómetro llega a 0, para
+// compensar la latencia de red; esa respuesta vale 0 puntos.
+const ANSWER_GRACE_MS = 1500;
+
 export function joinGame(code: string, playerName: string) {
-  const game = games.get(code);
+  const game = findGame(code);
 
   if (!game) {
     return null;
   }
 
-  // Evitar duplicar el jugador si refresca la pantalla
-  const existingPlayer = game.players.find(p => p.name === playerName);
-  
-  if (!existingPlayer) {
-    game.players.push({
+  // Evitar duplicar el jugador si refresca la pantalla o entra desde otro dispositivo.
+  let player = game.players.find(p => p.name === playerName);
+
+  if (!player) {
+    player = {
       id: crypto.randomUUID(),
       name: playerName,
       score: 0,
-      answeredQuestions: []
-
-    });
-
-    
+      answeredQuestions: [],
+    };
+    game.players.push(player);
   }
 
-  
-  return game; // ¡Asegúrate de retornar todo el objeto game completo aquí!
+  // Nunca se devuelve el juego completo: incluye las respuestas correctas.
+  return { code: game.code, player: { id: player.id, name: player.name } };
 }
 
-
-export function startGame(code: string) {
-  const game = games.get(code);
+export function startGame(code: string, now: number = Date.now()) {
+  const game = findGame(code);
 
   if (!game) {
     return null;
   }
 
-  game.currentQuestion = 0;
+  // Un doble clic en "Iniciar" no debe regresar el juego a la pregunta 1.
+  if (game.currentQuestion < 0) {
+    game.currentQuestion = 0;
+    game.questionStartedAt = now;
+  }
 
   return game;
 }
 
+function remainingMs(game: Game, now: number): number {
+  const startedAt = game.questionStartedAt ?? now;
+  return game.questionDurationSeconds * 1000 - (now - startedAt);
+}
 
+// Lo que ve el alumno: sin respuesta correcta, explicación ni conteos.
 export function getCurrentQuestion(
-  code: string
+  code: string,
+  now: number = Date.now(),
 ) {
-  const game = games.get(code);
+  const game = findGame(code);
 
   if (!game) {
     return null;
@@ -116,133 +136,123 @@ export function getCurrentQuestion(
   }
 
   return {
-    ...question,
+    id: question.id,
+    text: question.text,
+    options: [...question.options],
     durationSeconds: game.questionDurationSeconds,
+    remainingSeconds: Math.max(0, Math.ceil(remainingMs(game, now) / 1000)),
   };
 }
 
+export type SubmitAnswerResult =
+  | { status: "NOT_FOUND" }
+  // La pregunta ya cambió (la host avanzó): no se cuenta en la siguiente.
+  | { status: "STALE_QUESTION" }
+  | {
+      status: "OK";
+      correct: boolean;
+      alreadyAnswered: boolean;
+      timeUp: boolean;
+      score: number;
+      correctAnswer: number;
+      explanation: string;
+    };
+
+// El jugador se identifica por su nickname de sesión (no por un playerId que
+// cualquiera puede ver) y los puntos se calculan con el reloj del servidor.
 export function submitAnswer(
   code: string,
-  playerId: string,
+  playerName: string,
+  questionId: string,
   answer: number,
-  timeLeft: number
-) {
-  console.log("code:", code);
-  console.log("playerId:", playerId);
+  now: number = Date.now(),
+): SubmitAnswerResult {
+  const game = findGame(code);
+  const player = game?.players.find((p: Player) => p.name === playerName);
+  const question = game?.questions[game.currentQuestion];
 
-  const game = games.get(code);
+  if (!game || !player || !question) {
+    return { status: "NOT_FOUND" };
+  }
 
-  console.log("game:", game);
+  if (question.id !== questionId) {
+    return { status: "STALE_QUESTION" };
+  }
+
+  const reveal = { correctAnswer: question.correctAnswer, explanation: question.explanation };
+
+  if (player.answeredQuestions.includes(question.id)) {
+    return { status: "OK", correct: false, alreadyAnswered: true, timeUp: false, score: player.score, ...reveal };
+  }
+
+  const remaining = remainingMs(game, now);
+  const timeUp = remaining <= -ANSWER_GRACE_MS;
+  const validAnswer = Number.isInteger(answer) && answer >= 0 && answer < question.options.length;
+
+  player.answeredQuestions.push(question.id);
+
+  if (timeUp || !validAnswer) {
+    return { status: "OK", correct: false, alreadyAnswered: false, timeUp, score: player.score, ...reveal };
+  }
+
+  // Cada respuesta se cuenta UNA sola vez en las estadísticas.
+  question.answers[answer] = (question.answers[answer] ?? 0) + 1;
+
+  const correct = answer === question.correctAnswer;
+  if (correct) {
+    const secondsLeft = Math.min(Math.max(0, Math.ceil(remaining / 1000)), game.questionDurationSeconds);
+    player.score += secondsLeft * 100;
+  }
+
+  return { status: "OK", correct, alreadyAnswered: false, timeUp: false, score: player.score, ...reveal };
+}
+
+// Devuelve el juego y si con este paso terminó el quiz (solo una vez).
+export function nextQuestion(code: string, now: number = Date.now()) {
+  const game = findGame(code);
 
   if (!game) {
     return null;
   }
 
-  const player = game.players.find(
-  (p: Player) => p.id === playerId
-);
-
-  if (!player) {
-    return null;
-  }
-  const question =
-  game.questions[game.currentQuestion];
-
-if (!question) {
-  return null;
-}
-
-const alreadyAnswered =
-  player.answeredQuestions.includes(
-    question.id
-  );
-
-if (alreadyAnswered) {
-  return {
-    correct: false,
-    alreadyAnswered: true,
-    score: player.score,
-    correctAnswer: question.correctAnswer,
-    explanation: question.explanation,
-  };
-}
-
-player.answeredQuestions.push(
-  question.id
-);
-
-// ✅ Contamos la respuesta UNA sola vez
-if (
-  answer >= 0 &&
-  answer < question.answers.length &&
-  question.answers[answer] !== undefined
-) {
-  question.answers[answer]++;
-}
-
-const isCorrect =
-  answer === question.correctAnswer;
-
-if (isCorrect) {
-  const safeTimeLeft = Math.max(
-    0,
-    Math.min(
-      Math.ceil(timeLeft),
-      game.questionDurationSeconds
-    )
-  );
-
-  player.score += safeTimeLeft * 100;
-}
-
-return {
-  correct: isCorrect,
-  score: player.score,
-  correctAnswer: question.correctAnswer,
-  explanation: question.explanation,
-};
-
-}
-
-export function nextQuestion(code: string) {
-  const game = games.get(code);
-
-  if (!game) {
-    return null;
+  // Sin iniciar o ya terminado: no avanza (evita índices fuera de rango).
+  if (game.currentQuestion < 0 || game.currentQuestion >= game.questions.length) {
+    return { game, justFinished: false };
   }
 
- game.currentQuestion++;
+  game.currentQuestion++;
+  game.questionStartedAt = now;
 
-  return game;
+  return { game, justFinished: game.currentQuestion === game.questions.length };
 }
 
+// Público (lo usa el podio): solo nombre y puntos.
 export function getLeaderboard(
   code: string
 ) {
-  const game = games.get(code);
+  const game = findGame(code);
 
   if (!game) {
     return null;
   }
 
- return [...game.players].sort(
-  (a: Player, b: Player) =>
-    b.score - a.score
-);
+  return [...game.players]
+    .sort((a: Player, b: Player) => b.score - a.score)
+    .map(({ id, name, score }) => ({ id, name, score }));
 }
 
 
 export function getGame(code: string) {
-  return games.get(code);
+  return findGame(code);
 }
 
 export function deleteGame(code: string): void {
-  games.delete(code);
+  games.delete(normalizeGameCode(code));
 }
 
 // 1. Activa el icebreaker en el juego con una pregunta inicial
 export function startIcebreaker(code: string, question: string) {
-  const game = games.get(code);
+  const game = findGame(code);
   if (!game) return null;
 
   game.icebreaker = {
@@ -256,7 +266,7 @@ export function startIcebreaker(code: string, question: string) {
 
 // 2. Obtiene el estado actual del icebreaker
 export function getIcebreaker(code: string) {
-  const game = games.get(code);
+  const game = findGame(code);
   if (!game || !game.icebreaker) return null;
 
   return game.icebreaker;
@@ -264,7 +274,7 @@ export function getIcebreaker(code: string) {
 
 // 3. Guarda la respuesta abierta de un jugador
 export function submitIcebreakerAnswer(code: string, playerName: string, text: string) {
-  const game = games.get(code);
+  const game = findGame(code);
   if (!game || !game.icebreaker || !game.icebreaker.active) return null;
 
   // Evitar respuestas duplicadas del mismo jugador (opcional)
@@ -283,7 +293,7 @@ export function submitIcebreakerAnswer(code: string, playerName: string, text: s
 
 // 4. Desactiva o cierra el icebreaker
 export function closeIcebreaker(code: string) {
-  const game = games.get(code);
+  const game = findGame(code);
   if (!game || !game.icebreaker) return null;
 
   game.icebreaker.active = false;
@@ -294,7 +304,7 @@ export function getGameStats(
   code: string
 ){
 
-  const game = games.get(code);
+  const game = findGame(code);
 
 if (!game) {
   return null;

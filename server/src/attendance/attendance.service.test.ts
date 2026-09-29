@@ -11,12 +11,13 @@ import type { AttendanceRepository } from "./attendance.repository.js";
 import {
   AttendanceInputError,
   AttendanceClassNotFoundError,
+  AttendanceGroupNotFoundError,
   AttendanceService,
   AttendanceStudentNotAStudentError,
   AttendanceStudentNotFoundError,
   AttendanceStudentNotInGroupError,
 } from "./attendance.service.js";
-import type { AttendanceRecord, AttendanceStatus, ClassAttendanceEntry, StudentAttendanceEntry } from "./attendance.types.js";
+import type { AttendanceRecord, AttendanceStatus, ClassAttendanceEntry, GroupAttendanceMatrix, StudentAttendanceEntry } from "./attendance.types.js";
 
 const existingClass: ClassItem = {
   id: "1",
@@ -103,6 +104,7 @@ class FakeAttendanceRepository implements AttendanceRepository {
   }
 
   async findByStudent(): Promise<StudentAttendanceEntry[]> { return []; }
+  async findMatrixForGroup(): Promise<GroupAttendanceMatrix> { return { classes: [], students: [], records: [] }; }
 }
 
 function buildService(attendance = new FakeAttendanceRepository()) {
@@ -158,4 +160,25 @@ test("getClassAttendance includes students without an attendance record yet", as
     roster.map((entry) => entry.status),
     ["PRESENT", null],
   );
+});
+
+test("getGroupAttendance returns the students x classes matrix of an existing group", async () => {
+  const attendance = new FakeAttendanceRepository();
+  const matrix = {
+    classes: [{ id: existingClass.id, name: existingClass.name, classDate: existingClass.classDate }],
+    students: [{ id: studentInGroup.id, name: studentInGroup.name, lastNamePaternal: null, nickname: studentInGroup.nickname }],
+    records: [{ classId: existingClass.id, studentId: studentInGroup.id, status: "PRESENT" as const }],
+  };
+  attendance.findMatrixForGroup = async () => matrix;
+
+  assert.deepEqual(await buildService(attendance).getGroupAttendance("1"), matrix);
+});
+
+test("getGroupAttendance rejects an invalid id and a group that does not exist", async () => {
+  const groups = new FakeGroupRepository();
+  groups.findById = async () => null;
+  const service = new AttendanceService(new FakeAttendanceRepository(), new FakeClassRepository(), new FakeUserRepository(), groups);
+
+  await assert.rejects(buildService().getGroupAttendance("abc"), AttendanceInputError);
+  await assert.rejects(service.getGroupAttendance("99"), AttendanceGroupNotFoundError);
 });

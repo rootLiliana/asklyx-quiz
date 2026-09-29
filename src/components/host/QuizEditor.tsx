@@ -148,7 +148,7 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
 
   return (
     <div>
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
         <div>
           <label className={labelClass}>Título del quiz</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Pandas - Módulo 1" className={fieldClass} />
@@ -159,7 +159,7 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
         </div>
       </div>
 
-      <div className="grid gap-5">
+      <div className="grid grid-cols-1 gap-5">
         {questions.map((question, questionIndex) => (
           <div key={question.id || questionIndex} className="rounded-2xl bg-black/20 p-5">
             <div className="flex items-center justify-between gap-4 mb-4">
@@ -182,12 +182,12 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
             <textarea
               value={question.explanation}
               onChange={(e) => updateQuestion(questionIndex, { explanation: e.target.value })}
-              placeholder="Explicación que verán las alumnas después de responder..."
+              placeholder="Explicación que verán los alumnos después de responder..."
               className={`${fieldClass} min-h-24 mb-4`}
             />
 
             <p className="text-xs text-slate-400 mb-2">Marca la respuesta correcta.</p>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {question.options.map((option, optionIndex) => (
                 <label key={optionIndex} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
                   <input
@@ -200,7 +200,7 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
                     value={option}
                     onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
                     placeholder={`Opción ${optionIndex + 1}`}
-                    className="w-full rounded-lg bg-transparent border border-white/20 p-2 text-white placeholder:text-slate-400"
+                    className="w-full min-w-0 rounded-lg bg-transparent border border-white/20 p-2 text-white placeholder:text-slate-400"
                   />
                   <button
                     onClick={(e) => { e.preventDefault(); removeOption(questionIndex, optionIndex); }}

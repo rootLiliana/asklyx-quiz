@@ -38,7 +38,7 @@ function CommonFieldsForm({ value, onChange, modules }: {
   const set = (changes: Partial<CommonFields>) => onChange({ ...value, ...changes });
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
         <label className={labelClass}>Módulo</label>
         <select value={value.moduleId} onChange={(e) => set({ moduleId: e.target.value })} className={fieldClass}>
@@ -150,7 +150,7 @@ function NewClassForm({ api, groups, modules, onCreated }: {
       <CommonFieldsForm value={fields} onChange={setFields} modules={modules} />
 
       <p className={`${labelClass} mt-5`}>Grupos y fechas</p>
-      <div className="grid gap-2 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {groups.map((group) => {
           const groupDate = groupDates[group.id];
           return (
@@ -228,7 +228,7 @@ function EditClassForm({ api, classItem, groups, modules, onSaved, onCancel }: {
 
   return (
     <div className="rounded-2xl bg-black/30 border border-fuchsia-400/40 p-5 my-2">
-      <div className="grid gap-4 md:grid-cols-2 mb-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-4">
         <div>
           <label className={labelClass}>Grupo</label>
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={fieldClass}>
@@ -328,7 +328,7 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       {catalog.error || modulesError ? (
         <section className={panelClass}><p className="text-red-300">{catalog.error || modulesError}</p></section>
       ) : (

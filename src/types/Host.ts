@@ -46,12 +46,11 @@ export interface EditableQuiz {
 
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "JUSTIFIED";
 
-// GET /classes/:id/attendance
-export interface AttendanceEntry {
-  studentId: string;
-  name: string;
-  nickname: string;
-  status: AttendanceStatus | null;
+// GET /groups/:groupId/attendance: alumnos x clases del grupo.
+export interface GroupAttendanceMatrix {
+  classes: { id: string; name: string; classDate: string | null }[];
+  students: { id: string; name: string; lastNamePaternal: string | null; nickname: string | null }[];
+  records: { classId: string; studentId: string; status: AttendanceStatus }[];
 }
 
 // Hace una petición autenticada al backend. Si la sesión ya no es válida

@@ -3,13 +3,21 @@ import type { ClassItem } from "../classes/class.types.js";
 import { GroupMembershipConflictError, type GroupRepository } from "../groups/group.repository.js";
 import type { UserRepository } from "../users/user.repository.js";
 import type { AttendanceRepository } from "./attendance.repository.js";
-import { ATTENDANCE_STATUSES, type AttendanceRecord, type AttendanceStatus, type ClassAttendanceEntry, type StudentAttendanceEntry } from "./attendance.types.js";
+import {
+  ATTENDANCE_STATUSES,
+  type AttendanceRecord,
+  type AttendanceStatus,
+  type ClassAttendanceEntry,
+  type GroupAttendanceMatrix,
+  type StudentAttendanceEntry,
+} from "./attendance.types.js";
 
 export class AttendanceInputError extends Error {}
 export class AttendanceClassNotFoundError extends Error {}
 export class AttendanceStudentNotFoundError extends Error {}
 export class AttendanceStudentNotAStudentError extends Error {}
 export class AttendanceStudentNotInGroupError extends Error {}
+export class AttendanceGroupNotFoundError extends Error {}
 
 export class AttendanceService {
   constructor(
@@ -87,6 +95,15 @@ export class AttendanceService {
     }
 
     return this.attendance.findRosterForClass(validClassId, classItem.groupId);
+  }
+
+  async getGroupAttendance(groupId: string): Promise<GroupAttendanceMatrix> {
+    const validGroupId = validateId(groupId, "groupId");
+    if (!(await this.groups.findById(validGroupId))) {
+      throw new AttendanceGroupNotFoundError("Group not found");
+    }
+
+    return this.attendance.findMatrixForGroup(validGroupId);
   }
 
   async getStudentAttendance(studentId: string): Promise<StudentAttendanceEntry[]> {

@@ -10,7 +10,7 @@ interface ClassPickerProps {
 
 export default function ClassPicker({ groups, selection }: ClassPickerProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
         <label className={labelClass}>Grupo</label>
         <select value={selection.groupId} onChange={(e) => selection.setGroupId(e.target.value)} className={fieldClass}>

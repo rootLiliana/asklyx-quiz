@@ -3,7 +3,7 @@ import { fieldClass, panelClass } from "../../lib/hostStyles";
 import type { HostFetch } from "../../types/Host";
 import type { PublicUser, UserRole } from "../../types/User";
 
-const ROLE_LABEL: Record<UserRole, string> = { STUDENT: "Alumna", HOST: "Host", ADMIN: "Admin" };
+const ROLE_LABEL: Record<UserRole, string> = { STUDENT: "Alumno", HOST: "Host", ADMIN: "Admin" };
 const ROLE_STYLE: Record<UserRole, string> = {
   STUDENT: "bg-white/10 text-slate-200",
   HOST: "bg-fuchsia-500/20 text-fuchsia-200",
@@ -38,7 +38,7 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
 
   const changeRole = async (user: PublicUser, role: "STUDENT" | "HOST") => {
     const who = user.nickname ?? user.name;
-    const action = role === "HOST" ? `¿Dar acceso de Host a ${who}? Ya no podrá jugar como alumna.` : `¿Quitar el acceso de Host a ${who}?`;
+    const action = role === "HOST" ? `¿Dar acceso de Host a ${who}? Ya no podrá jugar como alumno.` : `¿Quitar el acceso de Host a ${who}?`;
     if (!window.confirm(action)) return;
 
     setSavingUserId(user.id);
@@ -74,7 +74,7 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
       <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
         <div>
           <h2 className="text-2xl font-bold">Usuarias</h2>
-          <p className="text-sm text-slate-400">Para agregar una Host: que se registre como alumna y aquí le das acceso.</p>
+          <p className="text-sm text-slate-400">Para agregar una Host: que se registre como alumno y aquí le das acceso.</p>
         </div>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, nickname o correo..." className={`${fieldClass} md:max-w-sm`} />
       </div>
