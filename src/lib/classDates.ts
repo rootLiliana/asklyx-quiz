@@ -5,6 +5,16 @@ export function toIsoDay(classDate: string | null): string | null {
   return classDate ? classDate.slice(0, 10) : null;
 }
 
+// Primera fecha (desde `from`, incluida) que cae en uno de esos días de la
+// semana; si no hay días, `from`. -> "YYYY-MM-DD"
+export function nextDateOnWeekdays(weekdays: number[], from: Date = new Date()): string {
+  const date = new Date(from);
+  for (let i = 0; i < 7 && weekdays.length > 0 && !weekdays.includes(date.getDay()); i++) {
+    date.setDate(date.getDate() + 1);
+  }
+  return todayIsoDay(date);
+}
+
 export function todayIsoDay(date: Date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");

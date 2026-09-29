@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { API } from "../config/api";
 import AttendancePanel from "../components/host/AttendancePanel";
+import ClassesPanel from "../components/host/ClassesPanel";
 import LiveGame from "../components/host/LiveGame";
 import QuizLibrary from "../components/host/QuizLibrary";
 import SessionWizard, { type SessionInfo } from "../components/host/SessionWizard";
@@ -9,10 +10,11 @@ import type { Game } from "../types/Game";
 import type { HostFetch } from "../types/Host";
 import type { LoginResponse, PublicUser } from "../types/User";
 
-type Tab = "session" | "quizzes" | "attendance" | "users";
+type Tab = "session" | "classes" | "quizzes" | "attendance" | "users";
 
 const TAB_LABEL: Record<Tab, string> = {
   session: "🎮 Sesión",
+  classes: "📅 Clases",
   quizzes: "📚 Quizzes",
   attendance: "✅ Asistencia",
   users: "👥 Usuarias",
@@ -37,6 +39,8 @@ export default function Host() {
 
   const [tab, setTab] = useState<Tab>("session");
   const [liveGame, setLiveGame] = useState<{ game: Game; info: SessionInfo } | null>(null);
+  // Sube cuando cambian las clases, para que "Nueva sesión" las vuelva a cargar.
+  const [classesVersion, setClassesVersion] = useState(0);
 
   const clearSession = useCallback(() => {
     localStorage.removeItem("hostToken");
@@ -153,7 +157,9 @@ export default function Host() {
   }
 
   const isAdmin = hostUser.role === "ADMIN";
-  const tabs: Tab[] = isAdmin ? ["session", "quizzes", "attendance", "users"] : ["session", "quizzes", "attendance"];
+  const tabs: Tab[] = isAdmin
+    ? ["session", "classes", "quizzes", "attendance", "users"]
+    : ["session", "classes", "quizzes", "attendance"];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white p-4 md:p-8">
@@ -197,9 +203,10 @@ export default function Host() {
               onExit={() => setLiveGame(null)}
             />
           ) : (
-            <SessionWizard api={api} onGameCreated={(game, info) => setLiveGame({ game, info })} />
+            <SessionWizard key={classesVersion} api={api} onGameCreated={(game, info) => setLiveGame({ game, info })} />
           )}
         </div>
+        {tab === "classes" && <ClassesPanel api={api} onChanged={() => setClassesVersion((current) => current + 1)} />}
         {tab === "quizzes" && <QuizLibrary api={api} />}
         {tab === "attendance" && <AttendancePanel api={api} canEdit={isAdmin} />}
         {tab === "users" && isAdmin && <UsersPanel api={api} />}

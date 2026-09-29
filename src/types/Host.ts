@@ -10,8 +10,18 @@ export interface ClassSummary {
   name: string;
   moduleId: string;
   groupId: string;
+  description: string | null;
   classDate: string | null;
   startTime: string | null;
+  endTime: string | null;
+  status: string;
+}
+
+// GET /modules
+export interface ModuleSummary {
+  id: string;
+  name: string;
+  orderNumber: number;
 }
 
 // GET /host/quizzes

@@ -1,17 +1,22 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API } from "../config/api";
 import type { ClassSummary, GroupSummary } from "../types/Host";
 
-interface ClassCatalog {
+interface ClassCatalogData {
   groups: GroupSummary[];
   classes: ClassSummary[];
   loading: boolean;
   error: string;
 }
 
+interface ClassCatalog extends ClassCatalogData {
+  reload: () => void;
+}
+
 // Grupos y clases (GET /groups y GET /classes son públicos).
 export function useClassCatalog(): ClassCatalog {
-  const [catalog, setCatalog] = useState<ClassCatalog>({ groups: [], classes: [], loading: true, error: "" });
+  const [catalog, setCatalog] = useState<ClassCatalogData>({ groups: [], classes: [], loading: true, error: "" });
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,7 +36,9 @@ export function useClassCatalog(): ClassCatalog {
       });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [version]);
 
-  return catalog;
+  const reload = useCallback(() => setVersion((current) => current + 1), []);
+
+  return { ...catalog, reload };
 }

@@ -36,7 +36,8 @@ import { PasswordResetService } from "./users/password-reset.service.js";
 import { createGroupRouter } from "./groups/group.routes.js";
 import { GroupService } from "./groups/group.service.js";
 import { MysqlGroupRepository } from "./groups/group.repository.js";
-import { createClassRouter } from "./classes/class.routes.js";
+import { createClassRouter, createModuleRouter } from "./classes/class.routes.js";
+import { MysqlModuleRepository } from "./modules/module.repository.js";
 import { ClassInputError, ClassService } from "./classes/class.service.js";
 import { MysqlClassRepository } from "./classes/class.repository.js";
 import { createAttendanceRouter } from "./attendance/attendance.routes.js";
@@ -86,7 +87,7 @@ const quizSessionService = new QuizSessionService(
   new MysqlQuizSessionRepository(),
 );
 const groupService = new GroupService(groupRepository, users);
-const classService = new ClassService(classRepository, groupRepository);
+const classService = new ClassService(classRepository, groupRepository, new MysqlModuleRepository());
 const attendanceService = new AttendanceService(
   attendanceRepository,
   classRepository,
@@ -173,7 +174,8 @@ app.get("/health/db", async (_, res) => {
 app.use(createAuthRouter(userService, authSessions));
 app.use("/users", createUserRouter(guards, userService, passwordResetService, authSessions));
 app.use("/groups", createGroupRouter(guards, groupService, classService));
-app.use("/classes", createClassRouter(classService));
+app.use("/classes", createClassRouter(guards, classService));
+app.use("/modules", createModuleRouter(guards, classService));
 app.use(createAttendanceRouter(guards, attendanceService));
 app.use("/host/quizzes", createHostQuizRouter(requireHost, (req) => getAuthUser(req)?.id ?? null, quizContentService));
 
