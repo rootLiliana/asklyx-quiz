@@ -3,6 +3,7 @@ import { Router, type Request } from "express";
 import type { AuthGuards } from "../auth/auth.middleware.js";
 import {
   AttendanceClassNotFoundError,
+  AttendanceGroupNotFoundError,
   AttendanceInputError,
   AttendanceStudentNotAStudentError,
   AttendanceStudentNotFoundError,
@@ -53,6 +54,23 @@ export function createAttendanceRouter(guards: AuthGuards, attendanceService: At
         return;
       }
       if (error instanceof AttendanceClassNotFoundError) {
+        res.status(404).json({ message: error.message });
+        return;
+      }
+      next(error);
+    }
+  });
+
+  // Tabla alumnos x clases del grupo (solo lectura para hosts).
+  router.get("/groups/:groupId/attendance", guards.requireHost, async (req, res, next) => {
+    try {
+      res.json(await attendanceService.getGroupAttendance(getPathParam(req, "groupId")));
+    } catch (error: unknown) {
+      if (error instanceof AttendanceInputError) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+      if (error instanceof AttendanceGroupNotFoundError) {
         res.status(404).json({ message: error.message });
         return;
       }

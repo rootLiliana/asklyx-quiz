@@ -7,8 +7,10 @@ export interface Game {
   questions: Question[];
   currentQuestion: number;
   questionDurationSeconds: number;
+  // Momento (ms) en que empezó la pregunta actual: el tiempo lo mide el
+  // servidor, nunca el navegador.
+  questionStartedAt?: number;
   icebreaker?: IceBreaker;
-  
 }
 
 export interface IceBreaker {

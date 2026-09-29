@@ -165,7 +165,7 @@ export default function Host() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h1 className="text-4xl md:text-5xl font-bold">🎮 Lilihoot Control Center</h1>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold">🎮 Lilihoot Control Center</h1>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-300">
               {hostUser.nickname}

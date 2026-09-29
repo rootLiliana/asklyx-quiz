@@ -81,7 +81,7 @@ export default function SessionWizard({ api, onGameCreated }: SessionWizardProps
   };
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <section className={panelClass}>
         <h2 className="text-2xl font-bold mb-1">1 · Grupo y clase</h2>
         <p className="text-sm text-slate-400 mb-4">La asistencia de esta sesión se registrará en esta clase.</p>
@@ -114,7 +114,7 @@ export default function SessionWizard({ api, onGameCreated }: SessionWizardProps
           <>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por título o clase..." className={`${fieldClass} mb-4`} />
             {savedQuizzes.error && <p className="text-red-300 mb-3">{savedQuizzes.error}</p>}
-            <div className="grid gap-2 max-h-80 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto pr-1">
               {visibleQuizzes.map((quiz) => (
                 <label
                   key={quiz.id}

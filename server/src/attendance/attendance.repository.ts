@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { getDatabasePool } from "../db.js";
 import type {
+  GroupAttendanceMatrix,
   AttendanceRecord,
   AttendanceStatus,
   ClassAttendanceEntry,
@@ -31,10 +32,30 @@ interface StudentAttendanceRow extends RowDataPacket {
   checked_at: Date | string;
 }
 
+interface MatrixClassRow extends RowDataPacket {
+  id: number | string;
+  name: string;
+  class_date: Date | string | null;
+}
+
+interface MatrixStudentRow extends RowDataPacket {
+  id: number | string;
+  name: string;
+  last_name_paternal: string | null;
+  nickname: string | null;
+}
+
+interface MatrixRecordRow extends RowDataPacket {
+  class_id: number | string;
+  student_id: number | string;
+  status: AttendanceStatus;
+}
+
 export interface AttendanceRepository {
   upsert(classId: string, studentId: string, status: AttendanceStatus): Promise<AttendanceRecord>;
   findRosterForClass(classId: string, groupId: string): Promise<ClassAttendanceEntry[]>;
   findByStudent(studentId: string): Promise<StudentAttendanceEntry[]>;
+  findMatrixForGroup(groupId: string): Promise<GroupAttendanceMatrix>;
 }
 
 function serializeDate(value: Date | string): string {
@@ -104,6 +125,42 @@ export class MysqlAttendanceRepository implements AttendanceRepository {
       nickname: row.nickname,
       status: row.status,
     }));
+  }
+
+  async findMatrixForGroup(groupId: string): Promise<GroupAttendanceMatrix> {
+    const database = getDatabasePool();
+    const [[classRows], [studentRows], [recordRows]] = await Promise.all([
+      database.execute<MatrixClassRow[]>(
+        "SELECT id, name, class_date FROM classes WHERE group_id = ? ORDER BY class_date ASC, id ASC",
+        [groupId],
+      ),
+      database.execute<MatrixStudentRow[]>(
+        `SELECT u.id, u.name, u.last_name_paternal, u.nickname
+         FROM group_members gm
+         JOIN users u ON u.id = gm.user_id
+         WHERE gm.group_id = ?
+         ORDER BY u.name ASC, u.last_name_paternal ASC`,
+        [groupId],
+      ),
+      database.execute<MatrixRecordRow[]>(
+        `SELECT a.class_id, a.student_id, a.status
+         FROM attendance a
+         JOIN classes c ON c.id = a.class_id
+         WHERE c.group_id = ?`,
+        [groupId],
+      ),
+    ]);
+
+    return {
+      classes: classRows.map((row) => ({ id: String(row.id), name: row.name, classDate: serializeNullableDate(row.class_date) })),
+      students: studentRows.map((row) => ({
+        id: String(row.id),
+        name: row.name,
+        lastNamePaternal: row.last_name_paternal,
+        nickname: row.nickname,
+      })),
+      records: recordRows.map((row) => ({ classId: String(row.class_id), studentId: String(row.student_id), status: row.status })),
+    };
   }
 
   async findByStudent(studentId: string): Promise<StudentAttendanceEntry[]> {

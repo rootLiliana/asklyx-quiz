@@ -2,10 +2,10 @@ import { useState, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { API } from "../config/api";
-import type { Game } from "../types/Game";
 import type { LoginResponse, LoginUserInput, PublicUser, RegisterUserInput } from "../types/User";
 import { getTodayGroupName } from "../lib/studentGroup";
 import { inputClass, primaryButtonClass, secondaryButtonClass } from "../lib/authStyles";
+import { clearStudentSession } from "../lib/studentSession";
 
 type Step = "landing" | "login" | "forgot" | "register" | "code";
 
@@ -29,10 +29,6 @@ function loadStudentSession(): StudentSession | null {
   } catch {
     return null;
   }
-}
-
-function clearStudentSession() {
-  ["studentToken", "studentUser", "studentUserId", "studentNickname"].forEach((key) => localStorage.removeItem(key));
 }
 
 function persistStudentSession(session: StudentSession) {
@@ -280,7 +276,8 @@ export default function Join() {
     if (!studentSession) return;
 
     setJoinError("");
-    const trimmedCode = code.trim();
+    // Los códigos son en mayúsculas ("ANA-1234"); en el celular suelen escribirse en minúsculas.
+    const trimmedCode = code.trim().toUpperCase();
 
     if (!trimmedCode) {
       setJoinError("Ingresa el código de tu clase.");
@@ -290,7 +287,7 @@ export default function Join() {
     setJoining(true);
     try {
       // El servidor toma el nickname de la sesión, no de lo que mandemos.
-      const response = await fetch(`${API}/games/${trimmedCode}/join`, {
+      const response = await fetch(`${API}/games/${encodeURIComponent(trimmedCode)}/join`, {
         method: "POST",
         headers: { Authorization: `Bearer ${studentSession.token}` },
       });
@@ -308,19 +305,11 @@ export default function Join() {
         return;
       }
 
-      const game: Game = await response.json();
-      const player = game.players.find(
-        (p) => p.name.trim().toLowerCase() === (studentSession.user.nickname ?? "").toLowerCase(),
-      );
+      const joined: { code: string; player: { id: string; name: string } } = await response.json();
 
-      if (!player) {
-        setJoinError("No pudimos registrarte en el juego. Intenta nuevamente.");
-        return;
-      }
-
-      localStorage.setItem("playerId", player.id);
-      localStorage.setItem("playerName", player.name);
-      localStorage.setItem("gameCode", game.code);
+      localStorage.setItem("playerId", joined.player.id);
+      localStorage.setItem("playerName", joined.player.name);
+      localStorage.setItem("gameCode", joined.code);
 
       navigate("/icebreaker");
     } catch (error) {
@@ -509,6 +498,9 @@ export default function Join() {
                 placeholder="Tu nickname"
                 value={loginForm.nickname}
                 onChange={updateLoginField("nickname")}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
 
               <p className="text-white/70 text-sm mb-1">Contraseña</p>
@@ -518,6 +510,8 @@ export default function Join() {
                 type="password"
                 value={loginForm.password}
                 onChange={updateLoginField("password")}
+                enterKeyHint="go"
+                onKeyDown={(e) => { if (e.key === "Enter") void handleLogin(); }}
               />
 
               {loginNotice && <p className="text-green-300 text-center mb-4">{loginNotice}</p>}
@@ -565,12 +559,16 @@ export default function Join() {
                 type="email"
                 value={forgotForm.email}
                 onChange={updateForgotField("email")}
+                autoCapitalize="none"
               />
               <input
                 className={inputClass}
                 placeholder="Tu nickname"
                 value={forgotForm.nickname}
                 onChange={updateForgotField("nickname")}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
               <input
                 className={inputClass}
@@ -585,6 +583,8 @@ export default function Join() {
                 type="password"
                 value={forgotForm.confirmPassword}
                 onChange={updateForgotField("confirmPassword")}
+                enterKeyHint="go"
+                onKeyDown={(e) => { if (e.key === "Enter") void handleForgotPassword(); }}
               />
 
               {forgotError && <p className="text-red-300 text-center mb-4">{forgotError}</p>}
@@ -637,6 +637,7 @@ export default function Join() {
                 type="email"
                 value={registerForm.email}
                 onChange={updateRegisterField("email")}
+                autoCapitalize="none"
               />
 
               <input
@@ -644,6 +645,9 @@ export default function Join() {
                 placeholder="Elige un nickname"
                 value={registerForm.nickname}
                 onChange={updateRegisterField("nickname")}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
 
               <input
@@ -660,6 +664,8 @@ export default function Join() {
                 type="password"
                 value={registerForm.confirmPassword}
                 onChange={updateRegisterField("confirmPassword")}
+                enterKeyHint="go"
+                onKeyDown={(e) => { if (e.key === "Enter") void handleRegister(); }}
               />
 
               {registerError && (
@@ -695,6 +701,10 @@ export default function Join() {
                 placeholder="Código del juego"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                enterKeyHint="go"
+                onKeyDown={(e) => { if (e.key === "Enter") void handleJoin(); }}
                 disabled={!!codeFromUrl}
               />
 

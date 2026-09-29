@@ -250,15 +250,16 @@ app.post("/games", requireHost, async (req, res, next) => {
 // haciéndose pasar por otra y registrarle asistencia.
 app.post("/games/:code/join", requireStudent, (req, res) => {
   const nickname = getAuthUser(req)?.nickname ?? "";
-  const game = joinGame(getCodeParam(req), nickname);
+  const joined = joinGame(getCodeParam(req), nickname);
 
-  if (!game) {
+  if (!joined) {
     return res.status(404).json({
       message: "Game not found",
     });
   }
 
-  res.json(game);
+  // { code, player: { id, name } }: nunca el juego completo (tiene las respuestas).
+  res.json(joined);
 });
 
 
@@ -301,49 +302,55 @@ app.get("/games/:code/question", (req, res) => {
   res.json(question);
 });
 
-app.post("/games/:code/answer", (req, res) => {
-  const { code } = req.params;
-
-  const {
-    playerId,
-    answer,
-    timeLeft
-  } = req.body;
-
+// Solo alumnos con sesión: el jugador es SIEMPRE el nickname de la sesión.
+// Body: { questionId, answer }. Los puntos los calcula el servidor con su
+// propio reloj (el navegador ya no manda el tiempo restante).
+app.post("/games/:code/answer", requireStudent, (req, res) => {
+  const body = typeof req.body === "object" && req.body !== null ? req.body as Record<string, unknown> : {};
   const result = submitAnswer(
-    code,
-    playerId,
-    answer,
-    timeLeft
+    getCodeParam(req),
+    getAuthUser(req)?.nickname ?? "",
+    typeof body.questionId === "string" ? body.questionId : "",
+    typeof body.answer === "number" ? body.answer : -1,
   );
 
-  if (!result) {
-    return res.status(404).json({
-      message: "Unable to submit answer"
-    });
+  if (result.status === "NOT_FOUND") {
+    return res.status(404).json({ message: "Unable to submit answer" });
+  }
+  if (result.status === "STALE_QUESTION") {
+    return res.status(409).json({ code: "STALE_QUESTION", message: "The question already changed" });
   }
 
-  res.json(result);
+  res.json({
+    correct: result.correct,
+    alreadyAnswered: result.alreadyAnswered,
+    timeUp: result.timeUp,
+    score: result.score,
+    correctAnswer: result.correctAnswer,
+    explanation: result.explanation,
+  });
 });
 
 app.post("/games/:code/next", requireHost, async (req, res) => {
   const code = getCodeParam(req);
-  const game = nextQuestion(code);
+  const result = nextQuestion(code);
 
-  if (!game) {
+  if (!result) {
     return res.status(404).json({
       message: "Game not found",
     });
   }
 
+  const { game, justFinished } = result;
+
   // Asistencia automática (best-effort): justo cuando la HOST avanza después
   // de la última pregunta, el quiz termina y se registra PRESENT para las
   // alumnas que participaron, si este juego tiene una quiz_session persistida.
-  // La condición de igualdad hace que solo ocurra una vez por juego. Nunca
-  // bloquea ni rompe el avance: cualquier fallo queda solo logueado.
-  if (game.currentQuestion === game.questions.length) {
+  // justFinished solo es true en ese paso, así que ocurre una vez por juego.
+  // Nunca bloquea ni rompe el avance: cualquier fallo queda solo logueado.
+  if (justFinished) {
     try {
-      await gameAttendanceService.registerAttendanceForFinishedGame(code, game.players);
+      await gameAttendanceService.registerAttendanceForFinishedGame(game.code, game.players);
     } catch (error: unknown) {
       console.error("Error registrando asistencia automática al terminar el juego", error);
     }
@@ -400,14 +407,16 @@ app.get("/games/:code/icebreaker", (req, res) => {
 });
 
 // 3. POST: El jugador envía su respuesta abierta cuando se une o mientras está activo el rompehielos
-app.post("/games/:code/icebreaker/answer", (req, res) => {
-  const { playerName, text } = req.body; // Ej: { "playerName": "Juan", "text": "Pizza" }
+// Solo alumnos con sesión; el nombre sale de la sesión. Body: { text }
+app.post("/games/:code/icebreaker/answer", requireStudent, (req, res) => {
+  const playerName = getAuthUser(req)?.nickname ?? "";
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
 
   if (!playerName || !text) {
-    return res.status(400).json({ message: "playerName and text are required" });
+    return res.status(400).json({ message: "text is required" });
   }
 
-  const result = submitIcebreakerAnswer(req.params.code, playerName, text);
+  const result = submitIcebreakerAnswer(getCodeParam(req), playerName, text.slice(0, 500));
 
   if (!result) {
     return res.status(404).json({ message: "Game not found or Icebreaker is not active" });

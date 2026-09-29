@@ -148,6 +148,27 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
         </button>
       </div>
 
+      {/* Al terminar: abrir el podio animado (misma animación que ven los jugadores) */}
+      {finished && (
+        <motion.div
+          initial={{ opacity: 0, y: -20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 160, damping: 14 }}
+          className="mb-6 flex flex-col items-center gap-4 rounded-3xl border border-yellow-300/40 bg-gradient-to-r from-amber-500/25 via-fuchsia-600/25 to-purple-700/25 p-5 text-center sm:flex-row sm:justify-between sm:text-left"
+        >
+          <div>
+            <p className="text-2xl font-black">🏁 ¡Quiz terminado!</p>
+            <p className="text-sm text-slate-200">La asistencia ya se registró. Muestra a los campeones en pantalla grande.</p>
+          </div>
+          <button
+            onClick={() => window.open(`/podium?code=${encodeURIComponent(gameCode)}`, "_blank", "noopener")}
+            className="w-full shrink-0 rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-500 px-6 py-4 text-lg font-black text-purple-950 shadow-[0_0_30px_rgba(251,191,36,0.5)] transition hover:scale-105 sm:w-auto"
+          >
+            🏆 Ver podio
+          </button>
+        </motion.div>
+      )}
+
       {/* MODAL ICEBREAKER */}
       {showIceBreaker && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -184,7 +205,7 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold mb-3 text-slate-300">Respuestas Recibidas ({iceBreakerData.answers.length})</h4>
-                  <div className="grid md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2">
                     {iceBreakerData.answers.map((ans) => (
                       <div key={ans.id} className="bg-white/5 border border-white/10 rounded-xl p-4 shadow-sm">
                         <p className="text-white mb-2 italic">"{ans.text}"</p>
@@ -206,7 +227,7 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
       )}
 
       {/* CONTENIDO PRINCIPAL EN TRES COLUMNAS */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* COLUMNA 1: Panel Control de la Sala */}
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6">
@@ -240,7 +261,6 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
             </div>
             <p className="text-fuchsia-300 font-bold text-2xl tracking-wider">{gameCode}</p>
           </div>
-          <p className="mt-4 text-slate-300">Jugadoras unidas: {game.players.length}</p>
         </div>
 
         {/* COLUMNA 2: Pregunta Actual & Estadísticas Integradas */}
@@ -261,7 +281,7 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
                 </div>
 
                 <h3 className="text-2xl font-bold mb-4">{currentQuestion.text}</h3>
-                <div className="grid gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   {currentQuestion.options.map((option, index) => (
                     <button
                       key={index}
@@ -327,14 +347,24 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
           </div>
         </div>
 
-        {/* COLUMNA 3: Lista de Jugadoras & Ranking */}
+        {/* COLUMNA 3: Total de jugadores (sin nicknames) & Ranking */}
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6">
-          <h2 className="text-2xl mb-4">👥 Jugadoras</h2>
-          <div className="max-h-40 overflow-y-auto space-y-1 mb-6">
-            {game.players.map((player) => (
-              <p key={player.id} className="text-sm bg-white/5 p-2 rounded-lg">👤 {player.name}</p>
-            ))}
-            {game.players.length === 0 && <p className="text-xs text-slate-400">Esperando que entren participantes...</p>}
+          <h2 className="text-2xl mb-4">👥 Jugadores</h2>
+          <div className="mb-6 rounded-2xl bg-black/20 p-5 text-center">
+            <motion.p
+              key={game.players.length}
+              initial={{ scale: 1.4, color: "#f0abfc" }}
+              animate={{ scale: 1, color: "#ffffff" }}
+              transition={{ type: "spring", stiffness: 260, damping: 14 }}
+              className="text-6xl font-black"
+            >
+              {game.players.length}
+            </motion.p>
+            <p className="mt-1 text-sm text-slate-300">
+              {game.players.length === 0
+                ? "Esperando que entren participantes..."
+                : game.players.length === 1 ? "jugador conectado" : "jugadores conectados"}
+            </p>
           </div>
 
           <hr className="my-4 border-white/20" />
