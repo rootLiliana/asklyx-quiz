@@ -12,7 +12,7 @@ interface QuestionStat {
   percentage: number;
 }
 
-const QUESTION_DURATION_SECONDS = 15;
+const QUESTION_DURATION_SECONDS = 22;
 
 interface LiveGameProps {
   api: HostFetch;
