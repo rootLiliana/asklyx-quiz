@@ -7,6 +7,7 @@ interface QuizSessionRow extends RowDataPacket {
   id: number | string;
   quiz_id: number | string;
   host_id: number | string;
+  class_id: number | string | null;
   group_id: number | string | null;
   game_code: string;
   mode: QuizSessionMode;
@@ -26,6 +27,7 @@ function toQuizSession(row: QuizSessionRow): QuizSession {
     id: String(row.id),
     quizId: String(row.quiz_id),
     hostId: String(row.host_id),
+    classId: row.class_id === null ? null : String(row.class_id),
     groupId: row.group_id === null ? null : String(row.group_id),
     gameCode: row.game_code,
     mode: row.mode,
@@ -38,7 +40,7 @@ function toQuizSession(row: QuizSessionRow): QuizSession {
 export class MysqlQuizSessionRepository implements QuizSessionRepository {
   async findByGameCode(gameCode: string): Promise<QuizSession | null> {
     const [rows] = await getDatabasePool().execute<QuizSessionRow[]>(
-      "SELECT id, quiz_id, host_id, group_id, game_code, mode, status FROM quiz_sessions WHERE game_code = ? LIMIT 1",
+      "SELECT id, quiz_id, host_id, class_id, group_id, game_code, mode, status FROM quiz_sessions WHERE game_code = ? LIMIT 1",
       [gameCode],
     );
 
@@ -49,14 +51,15 @@ export class MysqlQuizSessionRepository implements QuizSessionRepository {
   async create(input: CreateQuizSessionInput): Promise<QuizSession> {
     try {
       const [result] = await getDatabasePool().execute<ResultSetHeader>(
-        "INSERT INTO quiz_sessions (quiz_id, host_id, group_id, game_code, mode, status) VALUES (?, ?, ?, ?, ?, 'WAITING')",
-        [input.quizId, input.hostId, input.groupId, input.gameCode, input.mode],
+        "INSERT INTO quiz_sessions (quiz_id, host_id, class_id, group_id, game_code, mode, status) VALUES (?, ?, ?, ?, ?, ?, 'WAITING')",
+        [input.quizId, input.hostId, input.classId, input.groupId, input.gameCode, input.mode],
       );
 
       return {
         id: String(result.insertId),
         quizId: input.quizId,
         hostId: input.hostId,
+        classId: input.classId,
         groupId: input.groupId,
         gameCode: input.gameCode,
         mode: input.mode,
@@ -67,7 +70,7 @@ export class MysqlQuizSessionRepository implements QuizSessionRepository {
         throw new QuizSessionConflictError("game code is already in use");
       }
       if (isDatabaseError(error, "ER_NO_REFERENCED_ROW_2")) {
-        throw new QuizSessionReferenceError("quiz, host, or group does not exist");
+        throw new QuizSessionReferenceError("quiz, host, class, or group does not exist");
       }
       throw error;
     }

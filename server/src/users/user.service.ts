@@ -5,6 +5,7 @@ import { ASSIGNABLE_USER_ROLES, USER_ROLES, type AssignableUserRole, type Regist
 export class UserInputError extends Error {}
 export class DuplicateUserError extends Error {}
 export class InvalidCredentialsError extends Error {}
+export class UserRoleChangeForbiddenError extends Error {}
 
 export class UserService {
   constructor(private readonly users: UserRepository) {}
@@ -89,7 +90,18 @@ export class UserService {
       throw new UserInputError("role must be STUDENT or HOST");
     }
 
-    return this.users.updateRole(validateId(id), role as AssignableUserRole);
+    const validId = validateId(id);
+    const current = await this.users.findById(validId);
+    if (!current) {
+      return null;
+    }
+    // El rol ADMIN solo se asigna o retira directo en la BD: así la admin no
+    // puede quitarse su propio acceso por accidente desde el panel.
+    if (current.role === "ADMIN") {
+      throw new UserRoleChangeForbiddenError("The ADMIN role cannot be changed from the app");
+    }
+
+    return this.users.updateRole(validId, role as AssignableUserRole);
   }
 }
 
@@ -119,11 +131,13 @@ function normalizeRegistration(input: RegisterUserPayload): NormalizedRegistrati
     throw new UserInputError("email must be valid");
   }
 
-  if (name.length > 255 || lastNamePaternal.length > 100 || (lastNameMaternal?.length ?? 0) > 100) {
+  // Mismos límites que las columnas de `users` (name varchar(150),
+  // nickname varchar(50), email/apellidos varchar(255)/(100)).
+  if (name.length > 150 || lastNamePaternal.length > 100 || (lastNameMaternal?.length ?? 0) > 100) {
     throw new UserInputError("name, lastNamePaternal, or lastNameMaternal is too long");
   }
 
-  if (email.length > 255 || nickname.length > 100) {
+  if (email.length > 255 || nickname.length > 50) {
     throw new UserInputError("email or nickname is too long");
   }
 

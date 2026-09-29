@@ -28,6 +28,7 @@ test("creates a PRACTICE session with the Game Manager code", async () => {
   await service.create({
     quizId: "10",
     hostId: "20",
+    classId: "3",
     groupId: null,
     gameCode: "ANA-4821",
     mode: "PRACTICE",
@@ -41,7 +42,7 @@ test("rejects unsupported session modes", () => {
   const service = new QuizSessionService(new FakeQuizSessionRepository());
 
   assert.throws(
-    () => service.create({ quizId: "10", hostId: "20", groupId: null, gameCode: "ANA-4821", mode: "LIVE" as "PRACTICE" }),
+    () => service.create({ quizId: "10", hostId: "20", classId: "3", groupId: null, gameCode: "ANA-4821", mode: "LIVE" as "PRACTICE" }),
     QuizSessionInputError,
   );
 });
@@ -50,7 +51,7 @@ test("findByGameCode returns the session created for that gameCode", async () =>
   const repository = new FakeQuizSessionRepository();
   const service = new QuizSessionService(repository);
 
-  await service.create({ quizId: "10", hostId: "20", groupId: "5", gameCode: "ANA-4821", mode: "PRACTICE" });
+  await service.create({ quizId: "10", hostId: "20", classId: "3", groupId: "5", gameCode: "ANA-4821", mode: "PRACTICE" });
   const session = await service.findByGameCode("ANA-4821");
 
   assert.equal(session?.quizId, "10");
@@ -61,4 +62,13 @@ test("findByGameCode returns null for an unknown gameCode", async () => {
   const service = new QuizSessionService(new FakeQuizSessionRepository());
 
   assert.equal(await service.findByGameCode("ANA-0000"), null);
+});
+
+test("rejects a session without a valid classId", () => {
+  const service = new QuizSessionService(new FakeQuizSessionRepository());
+
+  assert.throws(
+    () => service.create({ quizId: "10", hostId: "20", classId: "", groupId: null, gameCode: "ANA-4821", mode: "PRACTICE" }),
+    QuizSessionInputError,
+  );
 });

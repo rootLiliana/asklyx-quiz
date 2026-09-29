@@ -6,6 +6,7 @@ import Join from "./pages/Join";
 import Quiz from "./pages/Quiz";
 import IceBreaker from "./pages/IceBreaker";
 import  Podium  from "./pages/Podium";
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   return (
@@ -22,6 +23,8 @@ function App() {
         <Route path="/icebreaker" element={<IceBreaker />} />
 
         <Route path="/podium" element={<Podium />} />
+
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );

@@ -15,16 +15,17 @@ import {
   GroupUserNotStudentError,
 } from "./group.service.js";
 import type { CreateGroupInput, Group, GroupStudent } from "./group.types.js";
+import { CDD1_GROUP_NAME, CDD2_GROUP_NAME } from "./group-schedule.js";
 
 const existingGroup: Group = {
   id: "1",
-  name: "Grupo 1",
+  name: CDD1_GROUP_NAME,
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 const secondGroup: Group = {
   id: "2",
-  name: "Grupo 2",
+  name: CDD2_GROUP_NAME,
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
@@ -168,7 +169,7 @@ test("assignTodayGroupToStudent creates the membership for a valid STUDENT on a 
   const group = await service.assignTodayGroupToStudent(studentUser.id, MONDAY);
 
   assert.equal(group.id, existingGroup.id);
-  assert.equal(group.name, "Grupo 1");
+  assert.equal(group.name, CDD1_GROUP_NAME);
   assert.ok(groups.members.has(`${existingGroup.id}:${studentUser.id}`));
 });
 

@@ -5,8 +5,9 @@ import { API } from "../config/api";
 import type { Game } from "../types/Game";
 import type { LoginResponse, LoginUserInput, PublicUser, RegisterUserInput } from "../types/User";
 import { getTodayGroupName } from "../lib/studentGroup";
+import { inputClass, primaryButtonClass, secondaryButtonClass } from "../lib/authStyles";
 
-type Step = "landing" | "login" | "register" | "code";
+type Step = "landing" | "login" | "forgot" | "register" | "code";
 
 interface StudentSession {
   token: string;
@@ -14,49 +15,6 @@ interface StudentSession {
 }
 
 const CONNECTION_ERROR = "No pudimos conectarnos con el servidor. Intenta nuevamente.";
-
-const inputClass = `
-  w-full
-  p-4
-  rounded-xl
-  mb-4
-  text-lg
-  bg-white
-  text-black
-  focus:outline-none
-  focus:ring-4
-  focus:ring-fuchsia-400
-`;
-
-const primaryButtonClass = `
-  w-full
-  bg-gradient-to-r
-  from-fuchsia-500
-  to-purple-600
-  hover:from-fuchsia-400
-  hover:to-purple-500
-  text-white
-  font-bold
-  text-lg
-  py-4
-  rounded-xl
-  transition-all
-  duration-300
-  disabled:opacity-50
-`;
-
-const secondaryButtonClass = `
-  w-full
-  bg-white/20
-  hover:bg-white/30
-  text-white
-  font-bold
-  text-lg
-  py-4
-  rounded-xl
-  transition-all
-  duration-300
-`;
 
 function loadStudentSession(): StudentSession | null {
   const token = localStorage.getItem("studentToken");
@@ -73,11 +31,15 @@ function loadStudentSession(): StudentSession | null {
   }
 }
 
+function clearStudentSession() {
+  ["studentToken", "studentUser", "studentUserId", "studentNickname"].forEach((key) => localStorage.removeItem(key));
+}
+
 function persistStudentSession(session: StudentSession) {
   localStorage.setItem("studentToken", session.token);
   localStorage.setItem("studentUser", JSON.stringify(session.user));
   localStorage.setItem("studentUserId", session.user.id);
-  localStorage.setItem("studentNickname", session.user.nickname);
+  localStorage.setItem("studentNickname", session.user.nickname ?? "");
 }
 
 export default function Join() {
@@ -92,6 +54,11 @@ export default function Join() {
   const [loginForm, setLoginForm] = useState({ nickname: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [sendingForgot, setSendingForgot] = useState(false);
 
   const [registerForm, setRegisterForm] = useState({
     name: "",
@@ -152,6 +119,37 @@ export default function Join() {
       setLoginError(CONNECTION_ERROR);
     } finally {
       setLoggingIn(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setForgotError("");
+    const email = forgotEmail.trim();
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setForgotError("Escribe el correo con el que te registraste.");
+      return;
+    }
+
+    setSendingForgot(true);
+    try {
+      const response = await fetch(`${API}/users/password/forgot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        setForgotError("No pudimos enviar el correo. Intenta nuevamente.");
+        return;
+      }
+
+      setForgotSent(true);
+    } catch (error) {
+      console.error("Error al solicitar recuperación de contraseña:", error);
+      setForgotError(CONNECTION_ERROR);
+    } finally {
+      setSendingForgot(false);
     }
   };
 
@@ -255,11 +253,19 @@ export default function Join() {
 
     setJoining(true);
     try {
+      // El servidor toma el nickname de la sesión, no de lo que mandemos.
       const response = await fetch(`${API}/games/${trimmedCode}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: studentSession.user.nickname }),
+        headers: { Authorization: `Bearer ${studentSession.token}` },
       });
+
+      if (response.status === 401 || response.status === 403) {
+        clearStudentSession();
+        setStudentSession(null);
+        setLoginError("Tu sesión expiró. Inicia sesión de nuevo.");
+        setStep("login");
+        return;
+      }
 
       if (!response.ok) {
         setJoinError(mapJoinError(response.status));
@@ -268,7 +274,7 @@ export default function Join() {
 
       const game: Game = await response.json();
       const player = game.players.find(
-        (p) => p.name.trim().toLowerCase() === studentSession.user.nickname.toLowerCase(),
+        (p) => p.name.trim().toLowerCase() === (studentSession.user.nickname ?? "").toLowerCase(),
       );
 
       if (!player) {
@@ -483,6 +489,66 @@ export default function Join() {
               <button onClick={handleLogin} disabled={loggingIn} className={primaryButtonClass}>
                 {loggingIn ? "Entrando..." : "Entrar"}
               </button>
+
+              <button
+                onClick={() => {
+                  setForgotError("");
+                  setForgotSent(false);
+                  setStep("forgot");
+                }}
+                className="w-full text-white/70 text-sm mt-4 hover:text-white underline transition"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </motion.div>
+          )}
+
+          {step === "forgot" && (
+            <motion.div
+              key="forgot"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <button
+                onClick={() => setStep("login")}
+                className="text-white/60 text-sm mb-4 hover:text-white transition"
+              >
+                ← Volver
+              </button>
+
+              {forgotSent ? (
+                <>
+                  <p className="text-white text-xl font-bold text-center mb-3">📬 Revisa tu correo</p>
+                  <p className="text-white/80 text-center mb-6">
+                    Si <span className="font-semibold text-white">{forgotEmail.trim()}</span> está registrado, te
+                    enviamos un enlace para elegir una nueva contraseña. Vence en 1 hora.
+                  </p>
+                  <button onClick={() => setStep("login")} className={secondaryButtonClass}>
+                    Volver a iniciar sesión
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-white/80 mb-4">
+                    Escribe el correo con el que te registraste y te enviaremos un enlace para restablecer tu contraseña.
+                  </p>
+                  <input
+                    className={inputClass}
+                    placeholder="Correo electrónico"
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                  />
+
+                  {forgotError && <p className="text-red-300 text-center mb-4">{forgotError}</p>}
+
+                  <button onClick={handleForgotPassword} disabled={sendingForgot} className={primaryButtonClass}>
+                    {sendingForgot ? "Enviando..." : "Enviar enlace"}
+                  </button>
+                </>
+              )}
             </motion.div>
           )}
 
@@ -603,6 +669,9 @@ export default function Join() {
 }
 
 function mapLoginError(status: number): string {
+  if (status === 403) {
+    return "Esta cuenta es de Host: entra desde el panel de Host (/host).";
+  }
   if (status === 401) {
     return "Nickname o contraseña incorrectos.";
   }

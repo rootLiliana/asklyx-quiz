@@ -1,5 +1,6 @@
 import type { ClassRepository } from "../classes/class.repository.js";
-import type { GroupRepository } from "../groups/group.repository.js";
+import type { ClassItem } from "../classes/class.types.js";
+import { GroupMembershipConflictError, type GroupRepository } from "../groups/group.repository.js";
 import type { UserRepository } from "../users/user.repository.js";
 import type { AttendanceRepository } from "./attendance.repository.js";
 import { ATTENDANCE_STATUSES, type AttendanceRecord, type AttendanceStatus, type ClassAttendanceEntry, type StudentAttendanceEntry } from "./attendance.types.js";
@@ -26,18 +27,7 @@ export class AttendanceService {
       throw new AttendanceInputError(`status must be one of ${ATTENDANCE_STATUSES.join(", ")}`);
     }
 
-    const classItem = await this.classes.findById(validClassId);
-    if (!classItem) {
-      throw new AttendanceClassNotFoundError("Class not found");
-    }
-
-    const student = await this.users.findById(validStudentId);
-    if (!student) {
-      throw new AttendanceStudentNotFoundError("Student not found");
-    }
-    if (student.role !== "STUDENT") {
-      throw new AttendanceStudentNotAStudentError("Only STUDENT users can have attendance recorded");
-    }
+    const classItem = await this.findClassAndStudent(validClassId, validStudentId);
 
     const belongsToGroup = await this.groups.hasMember(classItem.groupId, validStudentId);
     if (!belongsToGroup) {
@@ -45,6 +35,47 @@ export class AttendanceService {
     }
 
     return this.attendance.upsert(validClassId, validStudentId, status as AttendanceStatus);
+  }
+
+  // Asistencia automática al terminar el quiz de una clase: haber terminado
+  // el quiz de esa clase es prueba suficiente de que la alumna asistió, así
+  // que si todavía no estaba inscrita en el grupo de la clase se le inscribe
+  // aquí mismo (en vez de rechazarla como hace record()).
+  async recordQuizCompletion(classId: string, studentId: string): Promise<AttendanceRecord> {
+    const validClassId = validateId(classId, "classId");
+    const validStudentId = validateId(studentId, "studentId");
+
+    const classItem = await this.findClassAndStudent(validClassId, validStudentId);
+
+    if (!(await this.groups.hasMember(classItem.groupId, validStudentId))) {
+      try {
+        await this.groups.addMember(classItem.groupId, validStudentId);
+      } catch (error: unknown) {
+        // Carrera concurrente: si ya quedó inscrita, el resultado es el deseado.
+        if (!(error instanceof GroupMembershipConflictError)) {
+          throw error;
+        }
+      }
+    }
+
+    return this.attendance.upsert(validClassId, validStudentId, "PRESENT");
+  }
+
+  private async findClassAndStudent(classId: string, studentId: string): Promise<ClassItem> {
+    const classItem = await this.classes.findById(classId);
+    if (!classItem) {
+      throw new AttendanceClassNotFoundError("Class not found");
+    }
+
+    const student = await this.users.findById(studentId);
+    if (!student) {
+      throw new AttendanceStudentNotFoundError("Student not found");
+    }
+    if (student.role !== "STUDENT") {
+      throw new AttendanceStudentNotAStudentError("Only STUDENT users can have attendance recorded");
+    }
+
+    return classItem;
   }
 
   async getClassAttendance(classId: string): Promise<ClassAttendanceEntry[]> {

@@ -1,8 +1,8 @@
-import { Router, type NextFunction, type Request, type Response } from "express";
+import { Router, type Request } from "express";
 
 import type { ClassService } from "../classes/class.service.js";
 import { ClassGroupNotFoundError, ClassInputError } from "../classes/class.service.js";
-import { getAuthenticatedStudentUserId } from "../users/student-session.js";
+import { getAuthUser, type AuthGuards } from "../auth/auth.middleware.js";
 import {
   GroupInputError,
   GroupMembershipDuplicateError,
@@ -16,15 +16,13 @@ import {
 } from "./group.service.js";
 import type { Group, GroupStudent } from "./group.types.js";
 
-type AuthGuard = (req: Request, res: Response, next: NextFunction) => void | Promise<void>;
-
 export function createGroupRouter(
-  requireAdmin: AuthGuard,
-  requireStudent: AuthGuard,
+  guards: AuthGuards,
   groupService: GroupService,
   classService: ClassService,
 ): Router {
   const router = Router();
+  const { requireAdmin, requireHost, requireStudent } = guards;
 
   router.post("/", requireAdmin, async (req, res, next) => {
     try {
@@ -73,7 +71,7 @@ export function createGroupRouter(
     }
   });
 
-  router.get("/:groupId/students", async (req, res, next) => {
+  router.get("/:groupId/students", requireHost, async (req, res, next) => {
     try {
       const students = await groupService.getStudents(getPathParam(req, "groupId"));
       res.json(students.map(toPublicStudent));
@@ -141,7 +139,7 @@ export function createGroupRouter(
   // body: este endpoint no lee ni acepta ningún groupId del cliente.
   router.post("/me/today", requireStudent, async (req, res, next) => {
     try {
-      const userId = getAuthenticatedStudentUserId(req);
+      const userId = getAuthUser(req)?.id;
       if (!userId) {
         res.status(401).json({ message: "Unauthorized" });
         return;

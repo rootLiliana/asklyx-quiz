@@ -6,81 +6,6 @@ import type { Question } from "./types/Question.js";
 
 const games = new Map<string, Game>();
 const QUESTION_DURATION_SECONDS = 15;
-let configuredQuestions: Question[] | null = null;
-
-const defaultQuestions: Question[] = [
-  {
-    "id": "1",
-    "text": "¿Cuál es la principal ventaja de utilizar funciones vectorizadas en Pandas?",
-    "options": [
-      "Permiten recorrer los datos usando ciclos for.",
-      "Aplican operaciones sobre toda la colección de datos de forma eficiente.",
-      "Solo funcionan con columnas numéricas.",
-      "Eliminan automáticamente los valores nulos."
-    ],
-    "correctAnswer": 1,
-    "explanation": "Las funciones vectorizadas aplican una operación a todos los elementos de una Serie o DataFrame de manera optimizada, evitando recorrer los datos elemento por elemento.",
-     
-  answers: [0, 0, 0, 0]
-  },
-  {
-    "id": "2",
-    "text": "¿Cuál de las siguientes funciones es una función de agregación en Pandas?",
-    "options": [
-      "sqrt()",
-      "replace()",
-      "mean()",
-      "astype()"
-    ],
-    "correctAnswer": 2,
-    "explanation": "Las funciones de agregación resumen varios valores en uno solo. mean() calcula el promedio de los datos.",
-     
-  answers: [0, 0, 0, 0]
-  },
-  {
-    "id": "3",
-    "text": "¿Qué hace Pandas al realizar una operación entre dos DataFrames?",
-    "options": [
-      "Une las filas según el orden en que aparecen.",
-      "Elimina automáticamente las filas con valores nulos.",
-      "Alinea los datos utilizando los índices y nombres de las columnas.",
-      "Solo permite la operación si ambos DataFrames tienen el mismo tamaño."
-    ],
-    "correctAnswer": 2,
-    "explanation": "Pandas alinea automáticamente las filas y columnas por sus etiquetas antes de realizar operaciones entre DataFrames.",
-     
-  answers: [0, 0, 0, 0]
-  },
-  {
-    "id": "4",
-    "text": "¿Qué realiza el método dropna(how='any')?",
-    "options": [
-      "Elimina las columnas que contienen valores nulos.",
-      "Reemplaza los valores faltantes por cero.",
-      "Elimina las filas que tengan al menos un valor faltante.",
-      "Elimina únicamente los registros duplicados."
-    ],
-    "correctAnswer": 2,
-    "explanation": "Con how='any', cualquier fila que contenga al menos un valor faltante (NaN) será eliminada.",
-     
-  answers: [0, 0, 0, 0]
-  },
-  {
-    "id": "5",
-    "text": "¿Cuál es el objetivo de convertir los nombres de las columnas a snake_case?",
-    "options": [
-      "Reducir el tamaño del DataFrame.",
-      "Mejorar la consistencia y facilitar el acceso a las columnas.",
-      "Eliminar automáticamente los espacios y valores nulos.",
-      "Ordenar las columnas alfabéticamente."
-    ],
-    "correctAnswer": 1,
-    "explanation": "Utilizar snake_case hace que los nombres de las columnas sean más consistentes y fáciles de utilizar en el código.",
-   
-  answers: [0, 0, 0, 0]
-  }
- 
-];
 
 function cloneQuestions(
   questions: Question[]
@@ -92,35 +17,11 @@ function cloneQuestions(
   }));
 }
 
-export function getConfiguredQuestions() {
-  return cloneQuestions(
-    configuredQuestions ??
-      defaultQuestions
-  );
-}
-
-export function setConfiguredQuestions(
-  questions: Question[]
-) {
-  configuredQuestions =
-    questions.map(question => ({
-      ...question,
-      options: [...question.options],
-
-      answers:
-        question.answers ??
-        new Array(question.options.length).fill(0),
-    }));
-
-  return getConfiguredQuestions();
-}
-
+// Las preguntas siempre vienen de un quiz guardado en la BD.
 export function createGame(
-  suppliedQuestions?: Question[],
+  suppliedQuestions: Question[],
 ) {
-  const questions = suppliedQuestions
-    ? cloneQuestions(suppliedQuestions)
-    : getConfiguredQuestions();
+  const questions = cloneQuestions(suppliedQuestions);
 
   const code = generateCode();
 

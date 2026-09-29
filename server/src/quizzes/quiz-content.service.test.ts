@@ -6,12 +6,12 @@ import type { ClassItem } from "../classes/class.types.js";
 import type { Question } from "../types/Question.js";
 import {
   QuizContentClassNotFoundError,
-  QuizContentGroupMismatchError,
   QuizContentInputError,
+  QuizContentNotFoundError,
   QuizContentService,
 } from "./quiz-content.service.js";
 import type { QuizContentRepository } from "./quiz-content.repository.js";
-import type { CreateQuizContent, QuizContent } from "./quiz-content.types.js";
+import type { CreateQuizContent, QuizContent, QuizSummary } from "./quiz-content.types.js";
 
 const questions: Question[] = [
   {
@@ -62,33 +62,51 @@ class FakeQuizContentRepository implements QuizContentRepository {
 
   async create(content: CreateQuizContent): Promise<QuizContent> {
     this.created = content;
-    this.quiz = {
-      id: "900",
-      classId: content.classId,
-      title: content.title,
-      description: content.description,
-      timeLimitSeconds: content.timeLimitSeconds,
-      createdBy: content.createdBy,
-      questions: content.questions.map((question, questionIndex) => ({
-        id: String(questionIndex + 100),
-        text: question.text,
-        explanation: question.explanation,
-        questionOrder: question.questionOrder,
-        points: question.points,
-        options: question.options.map((option, optionIndex) => ({
-          id: String(questionIndex * 10 + optionIndex + 1),
-          text: option.text,
-          optionOrder: option.optionOrder,
-          isCorrect: option.isCorrect,
-        })),
-      })),
-    };
+    this.quiz = toQuiz("900", content);
     return this.quiz;
   }
+
+  async update(id: string, content: CreateQuizContent): Promise<QuizContent | null> {
+    if (this.quiz?.id !== id) return null;
+    this.quiz = toQuiz(id, { ...content, createdBy: this.quiz.createdBy });
+    return this.quiz;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    if (this.quiz?.id !== id) return false;
+    this.quiz = null;
+    return true;
+  }
+
+  async findAll(): Promise<QuizSummary[]> { return []; }
 
   async findById(id: string): Promise<QuizContent | null> {
     return this.quiz?.id === id ? this.quiz : null;
   }
+}
+
+function toQuiz(id: string, content: CreateQuizContent): QuizContent {
+return {
+    id,
+    classId: content.classId,
+    title: content.title,
+    description: content.description,
+    timeLimitSeconds: content.timeLimitSeconds,
+    createdBy: content.createdBy,
+    questions: content.questions.map((question, questionIndex) => ({
+      id: String(questionIndex + 100),
+      text: question.text,
+      explanation: question.explanation,
+      questionOrder: question.questionOrder,
+      points: question.points,
+      options: question.options.map((option, optionIndex) => ({
+        id: String(questionIndex * 10 + optionIndex + 1),
+        text: option.text,
+        optionOrder: option.optionOrder,
+        isCorrect: option.isCorrect,
+      })),
+    })),
+  };
 }
 
 class FakeClassRepository implements ClassRepository {
@@ -172,45 +190,52 @@ test("create rejects an invalid (non-numeric) classId", async () => {
   );
 });
 
-test("resolveGroupIdForQuiz derives the groupId from the quiz's class when none is requested", async () => {
-  const service = buildService();
-  const quiz = await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
+test("update replaces title, class and questions of a saved quiz, keeping its creator", async () => {
+  const repository = new FakeQuizContentRepository();
+  const service = buildService(repository);
+  await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
 
-  const groupId = await service.resolveGroupIdForQuiz(quiz, null);
+  const updated = await service.update("900", {
+    classId: secondClass.id,
+    title: "  Python - repaso  ",
+    createdBy: "7",
+    questions: [questions[1]!],
+  });
 
-  assert.equal(groupId, existingClass.groupId);
+  assert.equal(updated.id, "900");
+  assert.equal(updated.classId, secondClass.id);
+  assert.equal(updated.title, "Python - repaso");
+  assert.equal(updated.createdBy, "2");
+  assert.equal(updated.questions.length, 1);
 });
 
-test("resolveGroupIdForQuiz accepts a requested groupId that matches the quiz's class", async () => {
-  const service = buildService();
-  const quiz = await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
-
-  const groupId = await service.resolveGroupIdForQuiz(quiz, existingClass.groupId);
-
-  assert.equal(groupId, existingClass.groupId);
-});
-
-test("resolveGroupIdForQuiz never trusts an arbitrary client groupId: rejects one that does not match the quiz's class", async () => {
-  const service = buildService();
-  const quiz = await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
+test("update rejects a quiz that does not exist and a class that does not exist", async () => {
+  const repository = new FakeQuizContentRepository();
+  const service = buildService(repository);
+  await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
 
   await assert.rejects(
-    service.resolveGroupIdForQuiz(quiz, secondClass.groupId),
-    QuizContentGroupMismatchError,
+    service.update("12345", { classId: existingClass.id, title: "Python", createdBy: "2", questions }),
+    QuizContentNotFoundError,
+  );
+  await assert.rejects(
+    service.update("900", { classId: "999", title: "Python", createdBy: "2", questions }),
+    QuizContentClassNotFoundError,
   );
 });
 
-test("resolveGroupIdForQuiz reports a controlled error if the quiz's class no longer exists", async () => {
-  const service = buildService();
-  const orphanQuiz: QuizContent = {
-    id: "901",
-    classId: "999",
-    title: "Huérfano",
-    description: null,
-    timeLimitSeconds: null,
-    createdBy: "2",
-    questions: [],
-  };
+test("delete removes a saved quiz and rejects an unknown one", async () => {
+  const repository = new FakeQuizContentRepository();
+  const service = buildService(repository);
+  await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
 
-  await assert.rejects(service.resolveGroupIdForQuiz(orphanQuiz, null), QuizContentClassNotFoundError);
+  await service.delete("900");
+
+  assert.equal(await service.getById("900"), null);
+  await assert.rejects(service.delete("900"), QuizContentNotFoundError);
+});
+
+test("list rejects a non-numeric classId filter", () => {
+  const service = buildService();
+  assert.throws(() => service.list("abc"), QuizContentInputError);
 });
