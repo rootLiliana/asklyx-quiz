@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Request, Response } from "express";
 
-import { createStudentSession, getAuthenticatedStudentUserId, requireStudentAuth } from "./student-session.js";
 import type { UserRepository } from "./user.repository.js";
 import {
   PlayerIdentityNotAStudentError,
@@ -80,17 +78,4 @@ test("resolveStudentByNickname never accepts a userId: its only input is the nic
   // no debe resolver nada a menos que ese valor exista literalmente como
   // nickname: la función jamás interpreta su argumento como un id directo.
   await assert.rejects(service.resolveStudentByNickname(studentUser.id), PlayerIdentityNotFoundError);
-});
-
-test("the studentToken (via requireStudentAuth) remains the source of identity for the authenticated student herself, independent of this resolver", () => {
-  const token = createStudentSession(studentUser.id);
-  // El body intenta declarar un userId distinto; debe ser ignorado por completo.
-  const req = { headers: { authorization: `Bearer ${token}` }, body: { userId: "999" } } as unknown as Request;
-  const res = { status: () => res, json: () => undefined } as unknown as Response;
-  let nextCalled = false;
-
-  requireStudentAuth(req, res, () => { nextCalled = true; });
-
-  assert.equal(nextCalled, true);
-  assert.equal(getAuthenticatedStudentUserId(req), studentUser.id);
 });

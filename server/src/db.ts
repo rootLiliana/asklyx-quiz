@@ -29,6 +29,9 @@ function getDatabaseOptions(): PoolOptions {
     user: getRequiredEnv("DB_USER"),
     password: getRequiredEnv("DB_PASSWORD"),
     database: getRequiredEnv("DB_NAME"),
+    // Columnas DATE (p. ej. classes.class_date) como "YYYY-MM-DD" tal cual:
+    // convertirlas a Date las movería de día según la zona horaria del servidor.
+    dateStrings: ["DATE"],
     waitForConnections: true,
     connectionLimit: 10,
     enableKeepAlive: true,

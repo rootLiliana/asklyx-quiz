@@ -5,7 +5,7 @@ import type { ClassRepository } from "../classes/class.repository.js";
 import type { ClassItem } from "../classes/class.types.js";
 import type { CreateGroupInput, Group, GroupStudent } from "../groups/group.types.js";
 import type { GroupRepository } from "../groups/group.repository.js";
-import type { CreateQuizContent, QuizContent } from "../quizzes/quiz-content.types.js";
+import type { QuizContent, QuizSummary } from "../quizzes/quiz-content.types.js";
 import type { QuizContentRepository } from "../quizzes/quiz-content.repository.js";
 import { QuizContentService } from "../quizzes/quiz-content.service.js";
 import type { CreateQuizSessionInput, QuizSession } from "../quizSessions/quiz-session.types.js";
@@ -31,6 +31,9 @@ const existingClass: ClassItem = {
   status: "SCHEDULED",
 };
 
+// Misma clase/tema, pero del otro grupo (otro día).
+const otherGroupClass: ClassItem = { ...existingClass, id: "2", groupId: "11", classDate: "2026-01-06" };
+
 const existingQuiz: QuizContent = {
   id: "500",
   classId: existingClass.id,
@@ -55,27 +58,35 @@ const studentAna: User = {
 
 const studentMaria: User = { ...studentAna, id: "26", nickname: "maria", name: "María" };
 const hostLili: User = { ...studentAna, id: "1", nickname: "lilis", role: "HOST" };
+// Alumna registrada que todavía no pertenece a ningún grupo.
+const studentSofia: User = { ...studentAna, id: "27", nickname: "sofia", name: "Sofía" };
 
 class FakeClassRepository implements ClassRepository {
   async findAll(): Promise<ClassItem[]> { return [existingClass]; }
-  async findById(id: string): Promise<ClassItem | null> { return id === existingClass.id ? existingClass : null; }
+  async findById(id: string): Promise<ClassItem | null> {
+    return [existingClass, otherGroupClass].find((classItem) => classItem.id === id) ?? null;
+  }
   async findByGroup(): Promise<ClassItem[]> { return [existingClass]; }
 }
 
 class FakeQuizContentRepository implements QuizContentRepository {
   async create(): Promise<QuizContent> { throw new Error("not used in these tests"); }
   async findById(id: string): Promise<QuizContent | null> { return id === existingQuiz.id ? existingQuiz : null; }
+  async findAll(): Promise<QuizSummary[]> { return []; }
+  async update(): Promise<QuizContent | null> { throw new Error("not used in these tests"); }
+  async delete(): Promise<boolean> { throw new Error("not used in these tests"); }
 }
 
 class FakeQuizSessionRepository implements QuizSessionRepository {
   private readonly sessionsByGameCode = new Map<string, QuizSession>();
 
-  seed(gameCode: string, quizId: string): void {
+  seed(gameCode: string, quizId: string, classItem: ClassItem | null = existingClass): void {
     this.sessionsByGameCode.set(gameCode, {
       id: "900",
       quizId,
       hostId: "1",
-      groupId: existingClass.groupId,
+      classId: classItem?.id ?? null,
+      groupId: classItem?.groupId ?? null,
       gameCode,
       mode: "PRACTICE",
       status: "WAITING",
@@ -97,12 +108,13 @@ class FakeUserRepository implements UserRepository {
   private readonly usersByNickname = new Map<string, User>([
     [studentAna.nickname, studentAna],
     [studentMaria.nickname, studentMaria],
+    [studentSofia.nickname, studentSofia],
     [hostLili.nickname, hostLili],
   ]);
 
   async create(): Promise<User> { return studentAna; }
   async findById(id: string): Promise<User | null> {
-    return [studentAna, studentMaria, hostLili].find((user) => user.id === id) ?? null;
+    return [studentAna, studentMaria, studentSofia, hostLili].find((user) => user.id === id) ?? null;
   }
   async findByEmail(): Promise<User | null> { return null; }
   async findByNickname(nickname: string): Promise<User | null> { return this.usersByNickname.get(nickname) ?? null; }
@@ -117,10 +129,13 @@ class FakeGroupRepository implements GroupRepository {
   async findByName(): Promise<Group | null> { return null; }
   async findAll(): Promise<Group[]> { return []; }
   async findMembers(): Promise<GroupStudent[]> { return []; }
+  readonly members = new Set([`${existingClass.groupId}:${studentAna.id}`, `${existingClass.groupId}:${studentMaria.id}`]);
   async hasMember(groupId: string, userId: string): Promise<boolean> {
-    return groupId === existingClass.groupId && (userId === studentAna.id || userId === studentMaria.id);
+    return this.members.has(`${groupId}:${userId}`);
   }
-  async addMember(): Promise<void> {}
+  async addMember(groupId: string, userId: string): Promise<void> {
+    this.members.add(`${groupId}:${userId}`);
+  }
   async removeMember(): Promise<boolean> { return true; }
 }
 
@@ -160,16 +175,20 @@ function buildServices() {
     attendanceService,
   );
 
-  return { gameAttendanceService, quizSessionRepository, attendanceRepository };
+  return { gameAttendanceService, quizSessionRepository, attendanceRepository, groupRepository };
 }
 
 const GAME_CODE = "ANA-1234";
+
+function player(name: string, answeredQuestions: string[] = ["q1"]) {
+  return { name, answeredQuestions };
+}
 
 test("registers PRESENT for a single valid student player, using the classId resolved from game_code -> quiz_session -> quiz", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
 
   assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentAna.id}`), "PRESENT");
   assert.equal(attendanceRepository.records.size, 1);
@@ -179,19 +198,19 @@ test("registers PRESENT for two valid student players", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }, { name: "maria" }]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana"), player("maria")]);
 
   assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentAna.id}`), "PRESENT");
   assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentMaria.id}`), "PRESENT");
   assert.equal(attendanceRepository.records.size, 2);
 });
 
-test("an unknown nickname does not break the start of the game and the rest are still processed", async () => {
+test("an unknown nickname does not break the end of the game and the rest are still processed", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
   await assert.doesNotReject(
-    gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "no-existe" }, { name: "ana" }]),
+    gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("no-existe"), player("ana")]),
   );
 
   assert.equal(attendanceRepository.records.size, 1);
@@ -202,7 +221,7 @@ test("a HOST/ADMIN nickname does not generate attendance", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "lilis" }, { name: "ana" }]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("lilis"), player("ana")]);
 
   assert.equal(attendanceRepository.records.size, 1);
   assert.equal(attendanceRepository.records.has(`${existingClass.id}:${hostLili.id}`), false);
@@ -212,43 +231,43 @@ test("running the registration twice does not duplicate records (idempotent, res
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }]);
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
 
   assert.equal(attendanceRepository.records.size, 1);
   assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentAna.id}`), "PRESENT");
 });
 
-test("with no players, the game starts normally: it is not an error", async () => {
+test("with no players, the game finishes normally: it is not an error", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
-  await assert.doesNotReject(gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, []));
+  await assert.doesNotReject(gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, []));
   assert.equal(attendanceRepository.records.size, 0);
 });
 
-test("if attendance fails for one student, the game continues starting and the other students are still processed", async () => {
+test("if attendance fails for one student, the game still finishes and the other students are still processed", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
   attendanceRepository.shouldFailFor = studentAna.id;
 
   await assert.doesNotReject(
-    gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }, { name: "maria" }]),
+    gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana"), player("maria")]),
   );
 
   assert.equal(attendanceRepository.records.has(`${existingClass.id}:${studentAna.id}`), false);
   assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentMaria.id}`), "PRESENT");
 });
 
-test("classId always comes from game_code -> quiz_session -> quiz -> classId, never from an external value: no such parameter exists", async () => {
+test("classId always comes from game_code -> quiz_session -> classId, never from an external value: no such parameter exists", async () => {
   const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
 
-  // registerPresentPlayersForGame(gameCode, players) no acepta ni recibe
+  // registerAttendanceForFinishedGame(gameCode, players) no acepta ni recibe
   // ningún classId: el único registrado corresponde exactamente al de la
-  // clase real del quiz de esa quiz_session.
+  // clase guardada en esa quiz_session.
   const [key] = attendanceRepository.records.keys();
   assert.equal(key?.split(":")[0], existingClass.id);
 });
@@ -258,7 +277,7 @@ test("userId used for attendance is resolved from users.nickname (PlayerIdentity
   quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
 
   // GamePlayer = { name }: no hay forma de pasarle un userId directamente.
-  await gameAttendanceService.registerPresentPlayersForGame(GAME_CODE, [{ name: "ana" }]);
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
 
   const [key] = attendanceRepository.records.keys();
   assert.equal(key?.split(":")[1], studentAna.id);
@@ -269,8 +288,48 @@ test("a game without a persisted quiz_session (legacy flow) registers no attenda
   // No se llama a quizSessionRepository.seed(): no existe game_code -> quiz_session.
 
   await assert.doesNotReject(
-    gameAttendanceService.registerPresentPlayersForGame("ANA-LEGACY", [{ name: "ana" }]),
+    gameAttendanceService.registerAttendanceForFinishedGame("ANA-LEGACY", [player("ana")]),
   );
 
   assert.equal(attendanceRepository.records.size, 0);
+});
+
+test("a player who joined but never answered a question gets no attendance", async () => {
+  const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
+  quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
+
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana", []), player("maria")]);
+
+  assert.equal(attendanceRepository.records.has(`${existingClass.id}:${studentAna.id}`), false);
+  assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentMaria.id}`), "PRESENT");
+});
+
+test("a student who finished the quiz but was not in the class group is enrolled and marked PRESENT", async () => {
+  const { gameAttendanceService, quizSessionRepository, attendanceRepository, groupRepository } = buildServices();
+  quizSessionRepository.seed(GAME_CODE, existingQuiz.id);
+
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("sofia")]);
+
+  assert.equal(groupRepository.members.has(`${existingClass.groupId}:${studentSofia.id}`), true);
+  assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentSofia.id}`), "PRESENT");
+});
+
+test("the same quiz reused with another group records attendance in the session's class, not the quiz's class", async () => {
+  const { gameAttendanceService, quizSessionRepository, attendanceRepository, groupRepository } = buildServices();
+  quizSessionRepository.seed(GAME_CODE, existingQuiz.id, otherGroupClass);
+
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
+
+  assert.equal(attendanceRepository.records.get(`${otherGroupClass.id}:${studentAna.id}`), "PRESENT");
+  assert.equal(attendanceRepository.records.has(`${existingClass.id}:${studentAna.id}`), false);
+  assert.equal(groupRepository.members.has(`${otherGroupClass.groupId}:${studentAna.id}`), true);
+});
+
+test("a session created before quiz_sessions.class_id existed falls back to the quiz's class", async () => {
+  const { gameAttendanceService, quizSessionRepository, attendanceRepository } = buildServices();
+  quizSessionRepository.seed(GAME_CODE, existingQuiz.id, null);
+
+  await gameAttendanceService.registerAttendanceForFinishedGame(GAME_CODE, [player("ana")]);
+
+  assert.equal(attendanceRepository.records.get(`${existingClass.id}:${studentAna.id}`), "PRESENT");
 });

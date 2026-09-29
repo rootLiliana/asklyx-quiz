@@ -19,8 +19,9 @@ export interface PublicUser {
   name: string;
   lastNamePaternal: string | null;
   lastNameMaternal: string | null;
-  email: string;
-  nickname: string;
+  // Nullables en la tabla `users` (cuentas antiguas pueden no tenerlos).
+  email: string | null;
+  nickname: string | null;
   role: UserRole;
   createdAt: string;
   updatedAt: string;

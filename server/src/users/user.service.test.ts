@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { hashPassword } from "./password.js";
 import type { UserRepository } from "./user.repository.js";
-import { DuplicateUserError, InvalidCredentialsError, UserInputError, UserService } from "./user.service.js";
+import { DuplicateUserError, InvalidCredentialsError, UserInputError, UserRoleChangeForbiddenError, UserService } from "./user.service.js";
 import type { RegisterUserInput, User, UserRole, UserWithPasswordHash } from "./user.types.js";
 
 const existingUser: User = {
@@ -296,4 +296,28 @@ test("an existing account with last_name_paternal/last_name_maternal still NULL 
 
   // La contraseña que ya tenía antes de agregar las columnas sigue siendo válida.
   await assert.rejects(service.login("liliprueba", "otra-contraseña"), InvalidCredentialsError);
+});
+
+test("changeRole never changes the role of an ADMIN account from the app", async () => {
+  const repository = new FakeUserRepository();
+  repository.findById = async () => ({ ...existingUser, role: "ADMIN" });
+  const service = new UserService(repository);
+
+  await assert.rejects(service.changeRole("1", "STUDENT"), UserRoleChangeForbiddenError);
+});
+
+test("register rejects a name or nickname longer than the users table columns allow", async () => {
+  const service = new UserService(new FakeUserRepository());
+
+  await assert.rejects(
+    service.register({ name: "A".repeat(151), lastNamePaternal: "Pérez", email: "ana@example.com", nickname: "ana123", password: VALID_PASSWORD }),
+    UserInputError,
+  );
+  await assert.rejects(
+    service.register({ name: "Ana", lastNamePaternal: "Pérez", email: "ana@example.com", nickname: "n".repeat(51), password: VALID_PASSWORD }),
+    UserInputError,
+  );
+  await assert.doesNotReject(
+    service.register({ name: "A".repeat(150), lastNamePaternal: "Pérez", email: "ana@example.com", nickname: "n".repeat(50), password: VALID_PASSWORD }),
+  );
 });

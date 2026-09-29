@@ -1,5 +1,6 @@
-import { Router, type NextFunction, type Request, type Response } from "express";
+import { Router, type Request } from "express";
 
+import type { AuthGuards } from "../auth/auth.middleware.js";
 import {
   AttendanceClassNotFoundError,
   AttendanceInputError,
@@ -9,12 +10,11 @@ import {
   type AttendanceService,
 } from "./attendance.service.js";
 
-type AdminGuard = (req: Request, res: Response, next: NextFunction) => void | Promise<void>;
-
-export function createAttendanceRouter(requireAdmin: AdminGuard, attendanceService: AttendanceService): Router {
+// Las hosts pueden VER la asistencia; solo la admin puede editarla.
+export function createAttendanceRouter(guards: AuthGuards, attendanceService: AttendanceService): Router {
   const router = Router();
 
-  router.post("/classes/:classId/attendance", requireAdmin, async (req, res, next) => {
+  router.post("/classes/:classId/attendance", guards.requireAdmin, async (req, res, next) => {
     try {
       const body = asRecord(req.body);
       const studentId = typeof body.studentId === "number" ? String(body.studentId) : body.studentId;
@@ -43,7 +43,7 @@ export function createAttendanceRouter(requireAdmin: AdminGuard, attendanceServi
     }
   });
 
-  router.get("/classes/:classId/attendance", requireAdmin, async (req, res, next) => {
+  router.get("/classes/:classId/attendance", guards.requireHost, async (req, res, next) => {
     try {
       const roster = await attendanceService.getClassAttendance(getPathParam(req, "classId"));
       res.json(roster);
@@ -60,7 +60,7 @@ export function createAttendanceRouter(requireAdmin: AdminGuard, attendanceServi
     }
   });
 
-  router.get("/students/:studentId/attendance", requireAdmin, async (req, res, next) => {
+  router.get("/students/:studentId/attendance", guards.requireHost, async (req, res, next) => {
     try {
       const history = await attendanceService.getStudentAttendance(getPathParam(req, "studentId"));
       res.json(history);

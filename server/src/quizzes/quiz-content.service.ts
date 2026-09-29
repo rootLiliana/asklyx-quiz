@@ -2,11 +2,11 @@ import type { ClassRepository } from "../classes/class.repository.js";
 import type { Question } from "../types/Question.js";
 import { toGameManagerQuestions, toStoredQuestions } from "./quiz-content.mapper.js";
 import type { QuizContentRepository } from "./quiz-content.repository.js";
-import type { CreateQuizContentInput, QuizContent } from "./quiz-content.types.js";
+import type { CreateQuizContent, CreateQuizContentInput, QuizContent, QuizSummary } from "./quiz-content.types.js";
 
 export class QuizContentInputError extends Error {}
+export class QuizContentNotFoundError extends Error {}
 export class QuizContentClassNotFoundError extends Error {}
-export class QuizContentGroupMismatchError extends Error {}
 
 export class QuizContentService {
   constructor(
@@ -15,6 +15,38 @@ export class QuizContentService {
   ) {}
 
   async create(input: CreateQuizContentInput): Promise<QuizContent> {
+    return this.quizzes.create(await this.prepareContent(input));
+  }
+
+  // Reemplaza título, clase y preguntas de un quiz ya guardado. createdBy se
+  // conserva tal cual quedó al crearlo (no se modifica en la tabla).
+  async update(id: string, input: CreateQuizContentInput): Promise<QuizContent> {
+    const quiz = await this.quizzes.update(validateQuizId(id), await this.prepareContent(input));
+
+    if (!quiz) {
+      throw new QuizContentNotFoundError("Quiz not found");
+    }
+
+    return quiz;
+  }
+
+  async delete(id: string): Promise<void> {
+    const deleted = await this.quizzes.delete(validateQuizId(id));
+
+    if (!deleted) {
+      throw new QuizContentNotFoundError("Quiz not found");
+    }
+  }
+
+  list(classId?: string): Promise<QuizSummary[]> {
+    if (classId !== undefined && !/^\d+$/.test(classId)) {
+      throw new QuizContentInputError("classId must be a positive integer");
+    }
+
+    return this.quizzes.findAll(classId);
+  }
+
+  private async prepareContent(input: CreateQuizContentInput): Promise<CreateQuizContent> {
     const normalized = normalizeCreateInput(input);
 
     // classId lo elige la HOST explícitamente entre clases reales ya
@@ -26,47 +58,32 @@ export class QuizContentService {
       throw new QuizContentClassNotFoundError("Class not found");
     }
 
-    return this.quizzes.create({
+    return {
       classId: normalized.classId,
-      title: normalized.title,
-      description: normalized.description ?? null,
+      title: normalized.title.trim(),
+      description: normalized.description?.trim() || null,
       timeLimitSeconds: normalized.timeLimitSeconds ?? null,
       createdBy: normalized.createdBy,
       questions: toStoredQuestions(normalized.questions),
-    });
-  }
-
-  // Resuelve el groupId real que corresponde a un quiz ya persistido, a
-  // partir de la clase (quiz.classId) a la que quedó asociado al guardarse.
-  // Si el llamador propone un groupId (p. ej. porque el frontend lo envía de
-  // forma explícita), se verifica que coincida exactamente con el de la
-  // clase real: nunca se acepta un groupId arbitrario que no sea el de esa
-  // clase. Reutiliza ClassRepository, sin SQL nuevo.
-  async resolveGroupIdForQuiz(quiz: QuizContent, requestedGroupId: string | null): Promise<string> {
-    const classItem = await this.classes.findById(quiz.classId);
-    if (!classItem) {
-      throw new QuizContentClassNotFoundError("The quiz's class no longer exists");
-    }
-
-    if (requestedGroupId !== null && requestedGroupId !== classItem.groupId) {
-      throw new QuizContentGroupMismatchError("groupId does not match the group of the quiz's class");
-    }
-
-    return classItem.groupId;
+    };
   }
 
   getById(id: string): Promise<QuizContent | null> {
-    if (!/^\d+$/.test(id)) {
-      throw new QuizContentInputError("quiz id must be a positive integer");
-    }
-
-    return this.quizzes.findById(id);
+    return this.quizzes.findById(validateQuizId(id));
   }
 
   async getGameManagerQuestions(id: string): Promise<Question[] | null> {
     const quiz = await this.getById(id);
     return quiz ? toGameManagerQuestions(quiz) : null;
   }
+}
+
+function validateQuizId(id: string): string {
+  if (!/^\d+$/.test(id)) {
+    throw new QuizContentInputError("quiz id must be a positive integer");
+  }
+
+  return id;
 }
 
 function normalizeCreateInput(input: CreateQuizContentInput): CreateQuizContentInput {

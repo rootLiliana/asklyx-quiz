@@ -7,8 +7,8 @@ export class QuizSessionService {
   constructor(private readonly sessions: QuizSessionRepository) {}
 
   create(input: CreateQuizSessionInput): Promise<QuizSession> {
-    if (!/^\d+$/.test(input.quizId) || !/^\d+$/.test(input.hostId)) {
-      throw new QuizSessionInputError("quizId and hostId must be positive integers");
+    if (!/^\d+$/.test(input.quizId) || !/^\d+$/.test(input.hostId) || !/^\d+$/.test(input.classId)) {
+      throw new QuizSessionInputError("quizId, hostId and classId must be positive integers");
     }
     if (input.groupId !== null && !/^\d+$/.test(input.groupId)) {
       throw new QuizSessionInputError("groupId must be a positive integer when provided");

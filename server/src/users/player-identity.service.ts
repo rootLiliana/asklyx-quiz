@@ -15,9 +15,9 @@ export interface StudentPlayerIdentity {
 //
 // El único input es el nickname/player.name: esta clase nunca acepta ni lee
 // un userId directamente, así que no hay forma de "suplantar" a otra alumna
-// pasando un id arbitrario. Cuando se dispone de un studentToken (la propia
+// pasando un id arbitrario. Cuando se dispone de un token de sesión (la propia
 // alumna autenticada), la fuente de verdad sigue siendo
-// requireStudentAuth/getAuthenticatedStudentUserId (student-session.ts), no
+// requireStudent/getAuthUser (auth/auth.middleware.ts), no
 // este resolutor. Este servicio es para el caso en el que solo se conoce el
 // nickname/player.name (por ejemplo, del lado de la HOST).
 export class PlayerIdentityService {

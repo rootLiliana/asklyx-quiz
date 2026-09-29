@@ -1,9 +1,12 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import type { PoolConnection } from "mysql2/promise";
 
 import { getDatabasePool } from "../db.js";
 import type {
   CreateQuizContent,
+  CreateStoredQuestion,
   QuizContent,
+  QuizSummary,
   StoredOption,
   StoredQuestion,
 } from "./quiz-content.types.js";
@@ -15,6 +18,18 @@ interface QuizRow extends RowDataPacket {
   description: string | null;
   time_limit_seconds: number | null;
   created_by: number | string;
+}
+
+interface QuizSummaryRow extends RowDataPacket {
+  id: number | string;
+  title: string;
+  description: string | null;
+  class_id: number | string;
+  class_name: string;
+  class_date: Date | string | null;
+  group_id: number | string;
+  group_name: string | null;
+  question_count: number | string;
 }
 
 interface QuestionRow extends RowDataPacket {
@@ -36,9 +51,25 @@ interface OptionRow extends RowDataPacket {
 export interface QuizContentRepository {
   create(content: CreateQuizContent): Promise<QuizContent>;
   findById(id: string): Promise<QuizContent | null>;
+  findAll(classId?: string): Promise<QuizSummary[]>;
+  // Reemplaza datos y preguntas del quiz. null si el quiz no existe.
+  update(id: string, content: CreateQuizContent): Promise<QuizContent | null>;
+  // false si el quiz no existe.
+  delete(id: string): Promise<boolean>;
 }
 
 export class QuizContentConflictError extends Error {}
+// El quiz ya se usó en alguna sesión (quiz_sessions lo referencia), así que
+// no se puede borrar sin perder ese historial.
+export class QuizContentInUseError extends Error {}
+
+const SUMMARY_SELECT = `
+  SELECT q.id, q.title, q.description, q.class_id,
+         c.name AS class_name, c.class_date, c.group_id, g.name AS group_name,
+         (SELECT COUNT(*) FROM questions qu WHERE qu.quiz_id = q.id) AS question_count
+  FROM quizzes q
+  JOIN classes c ON c.id = q.class_id
+  LEFT JOIN user_groups g ON g.id = c.group_id`;
 
 export class MysqlQuizContentRepository implements QuizContentRepository {
   async create(content: CreateQuizContent): Promise<QuizContent> {
@@ -52,21 +83,7 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
       );
       const quizId = String(quizResult.insertId);
 
-      for (const question of content.questions) {
-        const [questionResult] = await connection.execute<ResultSetHeader>(
-          "INSERT INTO questions (quiz_id, question_text, explanation, question_order, points) VALUES (?, ?, ?, ?, ?)",
-          [quizId, question.text, question.explanation, question.questionOrder, question.points],
-        );
-        const questionId = String(questionResult.insertId);
-
-        for (const option of question.options) {
-          await connection.execute<ResultSetHeader>(
-            "INSERT INTO options (question_id, option_text, option_order, is_correct) VALUES (?, ?, ?, ?)",
-            [questionId, option.text, option.optionOrder, option.isCorrect],
-          );
-        }
-      }
-
+      await insertQuestions(connection, quizId, content.questions);
       await connection.commit();
       const quiz = await this.findById(quizId);
 
@@ -86,6 +103,82 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
     } finally {
       connection.release();
     }
+  }
+
+  async update(id: string, content: CreateQuizContent): Promise<QuizContent | null> {
+    const connection = await getDatabasePool().getConnection();
+
+    try {
+      await connection.beginTransaction();
+      const [existing] = await connection.execute<RowDataPacket[]>(
+        "SELECT id FROM quizzes WHERE id = ? LIMIT 1 FOR UPDATE",
+        [id],
+      );
+
+      if (existing.length === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      await connection.execute<ResultSetHeader>(
+        "UPDATE quizzes SET class_id = ?, title = ?, description = ?, time_limit_seconds = ? WHERE id = ?",
+        [content.classId, content.title, content.description, content.timeLimitSeconds, id],
+      );
+      await deleteQuestions(connection, id);
+      await insertQuestions(connection, id, content.questions);
+      await connection.commit();
+    } catch (error: unknown) {
+      await connection.rollback();
+
+      if (isDuplicateEntryError(error)) {
+        throw new QuizContentConflictError("Question or option order is already in use");
+      }
+      if (isReferencedRowError(error)) {
+        throw new QuizContentInUseError("The quiz questions are referenced by other records and cannot be replaced");
+      }
+
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return this.findById(id);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const connection = await getDatabasePool().getConnection();
+
+    try {
+      await connection.beginTransaction();
+      await deleteQuestions(connection, id);
+      const [result] = await connection.execute<ResultSetHeader>("DELETE FROM quizzes WHERE id = ?", [id]);
+      await connection.commit();
+
+      return result.affectedRows > 0;
+    } catch (error: unknown) {
+      await connection.rollback();
+
+      if (isReferencedRowError(error)) {
+        throw new QuizContentInUseError("The quiz has already been used in a session and cannot be deleted");
+      }
+
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async findAll(classId?: string): Promise<QuizSummary[]> {
+    const [rows] = classId
+      ? await getDatabasePool().execute<QuizSummaryRow[]>(
+          `${SUMMARY_SELECT} WHERE q.class_id = ? ORDER BY c.class_date DESC, q.id DESC`,
+          [classId],
+        )
+      : await getDatabasePool().execute<QuizSummaryRow[]>(
+          `${SUMMARY_SELECT} ORDER BY c.class_date DESC, q.id DESC`,
+        );
+
+    return rows.map(toQuizSummary);
   }
 
   async findById(id: string): Promise<QuizContent | null> {
@@ -158,6 +251,49 @@ function toStoredQuestion(row: QuestionRow): StoredQuestion {
     points: Number(row.points),
     options: [],
   };
+}
+
+async function insertQuestions(connection: PoolConnection, quizId: string, questions: CreateStoredQuestion[]): Promise<void> {
+  for (const question of questions) {
+    const [questionResult] = await connection.execute<ResultSetHeader>(
+      "INSERT INTO questions (quiz_id, question_text, explanation, question_order, points) VALUES (?, ?, ?, ?, ?)",
+      [quizId, question.text, question.explanation, question.questionOrder, question.points],
+    );
+    const questionId = String(questionResult.insertId);
+
+    for (const option of question.options) {
+      await connection.execute<ResultSetHeader>(
+        "INSERT INTO options (question_id, option_text, option_order, is_correct) VALUES (?, ?, ?, ?)",
+        [questionId, option.text, option.optionOrder, option.isCorrect],
+      );
+    }
+  }
+}
+
+async function deleteQuestions(connection: PoolConnection, quizId: string): Promise<void> {
+  await connection.execute<ResultSetHeader>(
+    "DELETE FROM options WHERE question_id IN (SELECT id FROM questions WHERE quiz_id = ?)",
+    [quizId],
+  );
+  await connection.execute<ResultSetHeader>("DELETE FROM questions WHERE quiz_id = ?", [quizId]);
+}
+
+function toQuizSummary(row: QuizSummaryRow): QuizSummary {
+  return {
+    id: String(row.id),
+    title: row.title,
+    description: row.description,
+    classId: String(row.class_id),
+    className: row.class_name,
+    classDate: row.class_date instanceof Date ? row.class_date.toISOString() : row.class_date,
+    groupId: String(row.group_id),
+    groupName: row.group_name,
+    questionCount: Number(row.question_count),
+  };
+}
+
+function isReferencedRowError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ER_ROW_IS_REFERENCED_2";
 }
 
 function isDuplicateEntryError(error: unknown): boolean {

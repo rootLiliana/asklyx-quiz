@@ -19,6 +19,19 @@ export interface QuizContent {
   questions: StoredQuestion[];
 }
 
+// Vista de lista: cada quiz con la clase (y su fecha) y el grupo al que pertenece.
+export interface QuizSummary {
+  id: string;
+  title: string;
+  description: string | null;
+  classId: string;
+  className: string;
+  classDate: string | null;
+  groupId: string;
+  groupName: string | null;
+  questionCount: number;
+}
+
 export interface StoredQuestion {
   id: string;
   text: string;
