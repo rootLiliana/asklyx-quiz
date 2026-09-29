@@ -15,6 +15,8 @@ export interface PasswordResetRepository {
   // transacción. Devuelve el userId, o null si el token no existe, ya se usó
   // o expiró.
   consumeAndSetPassword(tokenHash: string, passwordHash: string): Promise<string | null>;
+  // Cambio directo (recuperación con correo + nickname, sin enlace).
+  setPasswordHash(userId: string, passwordHash: string): Promise<void>;
 }
 
 export class MysqlPasswordResetRepository implements PasswordResetRepository {
@@ -41,6 +43,13 @@ export class MysqlPasswordResetRepository implements PasswordResetRepository {
     } finally {
       connection.release();
     }
+  }
+
+  async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await getDatabasePool().execute<ResultSetHeader>(
+      "UPDATE users SET password_hash = ? WHERE id = ?",
+      [passwordHash, userId],
+    );
   }
 
   async consumeAndSetPassword(tokenHash: string, passwordHash: string): Promise<string | null> {

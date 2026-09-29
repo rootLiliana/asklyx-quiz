@@ -148,9 +148,9 @@ export default function Host() {
             {loggingIn ? "Entrando..." : "Entrar"}
           </button>
           {loginError && <p className="mt-4 text-red-300">{loginError}</p>}
-          <a href="/join" className="block mt-6 text-center text-sm text-slate-400 hover:text-white">
-            ¿Olvidaste tu contraseña? Recupérala desde la pantalla de alumnas.
-          </a>
+          <p className="mt-6 text-center text-sm text-slate-400">
+            ¿Olvidaste tu contraseña? Pídele a la administradora que te ayude a restablecerla.
+          </p>
         </div>
       </div>
     );
