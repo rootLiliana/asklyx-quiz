@@ -16,7 +16,7 @@ export default function Quiz() {
 const navigate =
 useNavigate();
 
-const QUESTION_DURATION_SECONDS = 15;
+const QUESTION_DURATION_SECONDS = 22;
 
 
   const [question, setQuestion] =

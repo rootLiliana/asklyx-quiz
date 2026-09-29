@@ -2,7 +2,13 @@ import { Router, type Request } from "express";
 
 import type { AuthGuards } from "../auth/auth.middleware.js";
 import type { AuthSessionService } from "../auth/auth-session.service.js";
-import { PasswordResetInputError, PasswordResetInvalidTokenError, type PasswordResetService } from "./password-reset.service.js";
+import {
+  PasswordResetIdentityMismatchError,
+  PasswordResetInputError,
+  PasswordResetInvalidTokenError,
+  PasswordResetTooManyAttemptsError,
+  type PasswordResetService,
+} from "./password-reset.service.js";
 import {
   DuplicateUserError,
   InvalidCredentialsError,
@@ -89,6 +95,29 @@ export function createUserRouter(
     });
 
     res.status(202).json({ message: "If the email is registered, a reset link has been sent" });
+  });
+
+  // Recuperación sin correo: { email, nickname, password }. Solo alumnas.
+  router.post("/password/reset-direct", async (req, res, next) => {
+    try {
+      const body = asRecord(req.body);
+      await passwordResetService.resetWithIdentity(body.email, body.nickname, body.password);
+      res.json({ message: "Password updated" });
+    } catch (error: unknown) {
+      if (error instanceof PasswordResetInputError) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+      if (error instanceof PasswordResetIdentityMismatchError) {
+        res.status(400).json({ code: "IDENTITY_MISMATCH", message: error.message });
+        return;
+      }
+      if (error instanceof PasswordResetTooManyAttemptsError) {
+        res.status(429).json({ message: error.message });
+        return;
+      }
+      next(error);
+    }
   });
 
   router.post("/password/reset", async (req, res, next) => {

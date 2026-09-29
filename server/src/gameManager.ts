@@ -5,7 +5,7 @@ import type { Question } from "./types/Question.js";
 
 
 const games = new Map<string, Game>();
-const QUESTION_DURATION_SECONDS = 15;
+const QUESTION_DURATION_SECONDS = 22;
 
 function cloneQuestions(
   questions: Question[]

@@ -6,9 +6,12 @@ import { verifyPassword } from "./password.js";
 import type { PasswordResetRepository } from "./password-reset.repository.js";
 import {
   hashResetToken,
+  MAX_DIRECT_RESET_FAILURES,
+  PasswordResetIdentityMismatchError,
   PasswordResetInputError,
   PasswordResetInvalidTokenError,
   PasswordResetService,
+  PasswordResetTooManyAttemptsError,
 } from "./password-reset.service.js";
 import type { UserRepository } from "./user.repository.js";
 import type { User, UserRole, UserWithPasswordHash } from "./user.types.js";
@@ -25,10 +28,15 @@ const ana: User = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
+// Host con correo y nickname conocidos: nunca debe poder recuperarse sin enlace.
+const hostProfe: User = { ...ana, id: "2", email: "profe@example.com", nickname: "profe", role: "HOST" };
+
 class FakeUserRepository implements UserRepository {
   async create(): Promise<User> { return ana; }
   async findById(): Promise<User | null> { return ana; }
-  async findByEmail(email: string): Promise<User | null> { return email === ana.email ? ana : null; }
+  async findByEmail(email: string): Promise<User | null> {
+    return [ana, hostProfe].find((user) => user.email === email) ?? null;
+  }
   async findByNickname(): Promise<User | null> { return null; }
   async findAuthByNickname(): Promise<UserWithPasswordHash | null> { return null; }
   async updateRole(_: string, role: UserRole): Promise<User | null> { return { ...ana, role }; }
@@ -44,6 +52,10 @@ class FakeResetRepository implements PasswordResetRepository {
       if (entry.userId === userId) entry.used = true;
     }
     this.tokens.set(tokenHash, { userId, used: false });
+  }
+
+  async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
+    this.passwordHashes.set(userId, passwordHash);
   }
 
   async consumeAndSetPassword(tokenHash: string, passwordHash: string): Promise<string | null> {
@@ -64,14 +76,16 @@ function buildService() {
   const resets = new FakeResetRepository();
   const mailer = new FakeMailer();
   const revoked: string[] = [];
+  let now = 0;
   const service = new PasswordResetService(
     new FakeUserRepository(),
     resets,
     mailer,
     "https://lilihoot.example/",
     (userId) => revoked.push(userId),
+    () => now,
   );
-  return { service, resets, mailer, revoked };
+  return { service, resets, mailer, revoked, advance: (ms: number) => { now += ms; } };
 }
 
 function extractToken(message: MailMessage | undefined): string {
@@ -146,4 +160,55 @@ test("resetPassword rejects an unknown token and a short password", async () => 
   await assert.rejects(service.resetPassword("token-inventado", "NuevaClave123"), PasswordResetInvalidTokenError);
   await assert.rejects(service.resetPassword("token-inventado", "corta"), PasswordResetInputError);
   await assert.rejects(service.resetPassword("", "NuevaClave123"), PasswordResetInputError);
+});
+
+test("resetWithIdentity changes the password when email and nickname belong to the same student", async () => {
+  const { service, resets, revoked } = buildService();
+
+  await service.resetWithIdentity(" ANA@example.com ", " ANA123 ", "NuevaClave123");
+
+  const storedHash = resets.passwordHashes.get(ana.id);
+  assert.ok(storedHash);
+  assert.equal(await verifyPassword("NuevaClave123", storedHash), true);
+  assert.deepEqual(revoked, [ana.id]);
+});
+
+test("resetWithIdentity rejects a nickname that does not match the email, or an unknown email, with the same error", async () => {
+  const { service, resets } = buildService();
+
+  await assert.rejects(service.resetWithIdentity(ana.email, "otra", "NuevaClave123"), PasswordResetIdentityMismatchError);
+  await assert.rejects(service.resetWithIdentity("nadie@example.com", ana.nickname, "NuevaClave123"), PasswordResetIdentityMismatchError);
+  assert.equal(resets.passwordHashes.size, 0);
+});
+
+test("resetWithIdentity never works for HOST/ADMIN accounts, even with the right email and nickname", async () => {
+  const { service, resets } = buildService();
+
+  await assert.rejects(
+    service.resetWithIdentity(hostProfe.email, hostProfe.nickname, "NuevaClave123"),
+    PasswordResetIdentityMismatchError,
+  );
+  assert.equal(resets.passwordHashes.size, 0);
+});
+
+test("resetWithIdentity validates email, nickname and password length", async () => {
+  const { service } = buildService();
+
+  await assert.rejects(service.resetWithIdentity("no-es-correo", ana.nickname, "NuevaClave123"), PasswordResetInputError);
+  await assert.rejects(service.resetWithIdentity(ana.email, "  ", "NuevaClave123"), PasswordResetInputError);
+  await assert.rejects(service.resetWithIdentity(ana.email, ana.nickname, "corta"), PasswordResetInputError);
+});
+
+test("resetWithIdentity locks an email after too many failed attempts, even with the right data, until the window passes", async () => {
+  const { service, resets, advance } = buildService();
+
+  for (let attempt = 0; attempt < MAX_DIRECT_RESET_FAILURES; attempt++) {
+    await assert.rejects(service.resetWithIdentity(ana.email, "adivinando", "NuevaClave123"), PasswordResetIdentityMismatchError);
+  }
+
+  await assert.rejects(service.resetWithIdentity(ana.email, ana.nickname, "NuevaClave123"), PasswordResetTooManyAttemptsError);
+  assert.equal(resets.passwordHashes.size, 0);
+
+  advance(15 * 60_000);
+  await assert.doesNotReject(service.resetWithIdentity(ana.email, ana.nickname, "NuevaClave123"));
 });

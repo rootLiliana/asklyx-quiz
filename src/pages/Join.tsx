@@ -53,11 +53,11 @@ export default function Join() {
 
   const [loginForm, setLoginForm] = useState({ nickname: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [loginNotice, setLoginNotice] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
-  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotForm, setForgotForm] = useState({ email: "", nickname: "", password: "", confirmPassword: "" });
   const [forgotError, setForgotError] = useState("");
-  const [forgotSent, setForgotSent] = useState(false);
   const [sendingForgot, setSendingForgot] = useState(false);
 
   const [registerForm, setRegisterForm] = useState({
@@ -86,6 +86,7 @@ export default function Join() {
 
   const handleLogin = async () => {
     setLoginError("");
+    setLoginNotice("");
 
     const nickname = loginForm.nickname.trim();
     const password = loginForm.password;
@@ -122,35 +123,70 @@ export default function Join() {
     }
   };
 
+  // Recuperación sin correo: si el correo y el nickname son de la misma
+  // alumna, se guarda la contraseña nueva directamente.
   const handleForgotPassword = async () => {
     setForgotError("");
-    const email = forgotEmail.trim();
+    const email = forgotForm.email.trim();
+    const nickname = forgotForm.nickname.trim();
+    const { password, confirmPassword } = forgotForm;
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       setForgotError("Escribe el correo con el que te registraste.");
       return;
     }
+    if (!nickname) {
+      setForgotError("Escribe tu nickname.");
+      return;
+    }
+    if (password.length < 8) {
+      setForgotError("La contraseña nueva debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setForgotError("Las contraseñas no coinciden.");
+      return;
+    }
 
     setSendingForgot(true);
     try {
-      const response = await fetch(`${API}/users/password/forgot`, {
+      const response = await fetch(`${API}/users/password/reset-direct`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, nickname, password }),
       });
 
+      if (response.status === 429) {
+        setForgotError("Demasiados intentos. Espera 15 minutos o pídele ayuda a tu profe.");
+        return;
+      }
+      if (response.status === 400) {
+        const body = await response.json().catch(() => null);
+        setForgotError(body?.code === "IDENTITY_MISMATCH"
+          ? "El correo y el nickname no coinciden con ninguna cuenta. Revísalos."
+          : "Revisa tus datos e intenta de nuevo.");
+        return;
+      }
       if (!response.ok) {
-        setForgotError("No pudimos enviar el correo. Intenta nuevamente.");
+        setForgotError("No pudimos cambiar tu contraseña. Intenta nuevamente.");
         return;
       }
 
-      setForgotSent(true);
+      setForgotForm({ email: "", nickname: "", password: "", confirmPassword: "" });
+      setLoginForm({ nickname, password: "" });
+      setLoginError("");
+      setLoginNotice("✅ Tu contraseña se cambió. Ya puedes entrar con la nueva.");
+      setStep("login");
     } catch (error) {
-      console.error("Error al solicitar recuperación de contraseña:", error);
+      console.error("Error al restablecer contraseña:", error);
       setForgotError(CONNECTION_ERROR);
     } finally {
       setSendingForgot(false);
     }
+  };
+
+  const updateForgotField = (field: keyof typeof forgotForm) => (event: ChangeEvent<HTMLInputElement>) => {
+    setForgotForm((current) => ({ ...current, [field]: event.target.value }));
   };
 
   const handleRegister = async () => {
@@ -484,6 +520,7 @@ export default function Join() {
                 onChange={updateLoginField("password")}
               />
 
+              {loginNotice && <p className="text-green-300 text-center mb-4">{loginNotice}</p>}
               {loginError && <p className="text-red-300 text-center mb-4">{loginError}</p>}
 
               <button onClick={handleLogin} disabled={loggingIn} className={primaryButtonClass}>
@@ -493,7 +530,8 @@ export default function Join() {
               <button
                 onClick={() => {
                   setForgotError("");
-                  setForgotSent(false);
+                  setLoginNotice("");
+                  setForgotForm((current) => ({ ...current, nickname: current.nickname || loginForm.nickname.trim() }));
                   setStep("forgot");
                 }}
                 className="w-full text-white/70 text-sm mt-4 hover:text-white underline transition"
@@ -518,37 +556,42 @@ export default function Join() {
                 ← Volver
               </button>
 
-              {forgotSent ? (
-                <>
-                  <p className="text-white text-xl font-bold text-center mb-3">📬 Revisa tu correo</p>
-                  <p className="text-white/80 text-center mb-6">
-                    Si <span className="font-semibold text-white">{forgotEmail.trim()}</span> está registrado, te
-                    enviamos un enlace para elegir una nueva contraseña. Vence en 1 hora.
-                  </p>
-                  <button onClick={() => setStep("login")} className={secondaryButtonClass}>
-                    Volver a iniciar sesión
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-white/80 mb-4">
-                    Escribe el correo con el que te registraste y te enviaremos un enlace para restablecer tu contraseña.
-                  </p>
-                  <input
-                    className={inputClass}
-                    placeholder="Correo electrónico"
-                    type="email"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                  />
+              <p className="text-white/80 mb-4">
+                Escribe el correo y el nickname con los que te registraste, y elige una contraseña nueva.
+              </p>
+              <input
+                className={inputClass}
+                placeholder="Correo electrónico"
+                type="email"
+                value={forgotForm.email}
+                onChange={updateForgotField("email")}
+              />
+              <input
+                className={inputClass}
+                placeholder="Tu nickname"
+                value={forgotForm.nickname}
+                onChange={updateForgotField("nickname")}
+              />
+              <input
+                className={inputClass}
+                placeholder="Contraseña nueva"
+                type="password"
+                value={forgotForm.password}
+                onChange={updateForgotField("password")}
+              />
+              <input
+                className={inputClass}
+                placeholder="Confirmar contraseña nueva"
+                type="password"
+                value={forgotForm.confirmPassword}
+                onChange={updateForgotField("confirmPassword")}
+              />
 
-                  {forgotError && <p className="text-red-300 text-center mb-4">{forgotError}</p>}
+              {forgotError && <p className="text-red-300 text-center mb-4">{forgotError}</p>}
 
-                  <button onClick={handleForgotPassword} disabled={sendingForgot} className={primaryButtonClass}>
-                    {sendingForgot ? "Enviando..." : "Enviar enlace"}
-                  </button>
-                </>
-              )}
+              <button onClick={handleForgotPassword} disabled={sendingForgot} className={primaryButtonClass}>
+                {sendingForgot ? "Guardando..." : "Cambiar contraseña"}
+              </button>
             </motion.div>
           )}
 
