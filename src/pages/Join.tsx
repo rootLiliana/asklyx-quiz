@@ -705,7 +705,6 @@ export default function Join() {
                 autoCorrect="off"
                 enterKeyHint="go"
                 onKeyDown={(e) => { if (e.key === "Enter") void handleJoin(); }}
-                disabled={!!codeFromUrl}
               />
 
               {joinError && <p className="text-red-300 text-center mb-4">{joinError}</p>}
