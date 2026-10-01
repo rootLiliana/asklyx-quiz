@@ -234,9 +234,7 @@ export default function Host() {
   }
 
   const isAdmin = hostUser.role === "ADMIN";
-  const tabs: Tab[] = isAdmin
-    ? ["session", "classes", "quizzes", "attendance", "users"]
-    : ["session", "classes", "quizzes", "attendance"];
+  const tabs: Tab[] = ["session", "classes", "quizzes", "attendance", "users"];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white p-4 md:p-8">
@@ -286,7 +284,7 @@ export default function Host() {
         {tab === "classes" && <ClassesPanel api={api} onChanged={() => setClassesVersion((current) => current + 1)} />}
         {tab === "quizzes" && <QuizLibrary api={api} />}
         {tab === "attendance" && <AttendancePanel api={api} canEdit={isAdmin} />}
-        {tab === "users" && isAdmin && <UsersPanel api={api} />}
+        {tab === "users" && <UsersPanel api={api} canEdit={isAdmin} />}
       </div>
     </div>
   );

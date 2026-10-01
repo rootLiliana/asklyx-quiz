@@ -140,7 +140,8 @@ export function createUserRouter(
     }
   });
 
-  router.get("/", guards.requireAdmin, async (req, res, next) => {
+  // Las hosts pueden ver la lista; cambiar roles o contraseñas es solo admin.
+  router.get("/", guards.requireHost, async (req, res, next) => {
     try {
       const role = req.query.role;
       const users = await userService.listUsers(typeof role === "string" ? role : undefined);
