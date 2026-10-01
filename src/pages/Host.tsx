@@ -9,6 +9,7 @@ import UsersPanel from "../components/host/UsersPanel";
 import type { Game } from "../types/Game";
 import type { HostFetch } from "../types/Host";
 import type { LoginResponse, PublicUser } from "../types/User";
+import { changePassword, PASSWORD_HINT } from "../lib/changePassword";
 
 type Tab = "session" | "classes" | "quizzes" | "attendance" | "users";
 
@@ -36,6 +37,12 @@ export default function Host() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+
+  // Contraseña temporal: hay que elegir una nueva antes de usar el panel.
+  const [changeForm, setChangeForm] = useState({ current: "", next: "", confirm: "" });
+  const [knowsCurrent, setKnowsCurrent] = useState(false);
+  const [changeError, setChangeError] = useState("");
+  const [changing, setChanging] = useState(false);
 
   const [tab, setTab] = useState<Tab>("session");
   const [liveGame, setLiveGame] = useState<{ game: Game; info: SessionInfo } | null>(null);
@@ -100,7 +107,7 @@ export default function Host() {
         return;
       }
       if (!response.ok) {
-        setLoginError("Nickname o contraseña incorrectos.");
+        setLoginError("Nickname/correo o contraseña incorrectos. Recuerda que la contraseña distingue mayúsculas.");
         return;
       }
 
@@ -109,6 +116,11 @@ export default function Host() {
       localStorage.setItem("hostUser", JSON.stringify(data.user));
       setHostToken(data.token);
       setHostUser(data.user);
+      // Si es temporal ya la conocemos: no se la volvemos a pedir.
+      if (data.user.mustChangePassword) {
+        setChangeForm({ current: password, next: "", confirm: "" });
+        setKnowsCurrent(true);
+      }
       setPassword("");
     } catch (error) {
       console.error("Error al iniciar sesión", error);
@@ -116,6 +128,24 @@ export default function Host() {
     } finally {
       setLoggingIn(false);
     }
+  };
+
+  const saveNewPassword = async () => {
+    if (!hostUser) return;
+    setChanging(true);
+    setChangeError("");
+    const error = await changePassword(hostToken, changeForm.current, changeForm.next, changeForm.confirm);
+    setChanging(false);
+
+    if (error) {
+      setChangeError(error);
+      return;
+    }
+
+    const updated = { ...hostUser, mustChangePassword: false };
+    localStorage.setItem("hostUser", JSON.stringify(updated));
+    setHostUser(updated);
+    setChangeForm({ current: "", next: "", confirm: "" });
   };
 
   const logout = async () => {
@@ -133,7 +163,9 @@ export default function Host() {
           <input
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            placeholder="Nickname"
+            placeholder="Nickname o correo"
+            autoCapitalize="none"
+            autoCorrect="off"
             className="w-full mb-3 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400"
           />
           <input
@@ -142,8 +174,9 @@ export default function Host() {
             onKeyDown={(e) => { if (e.key === "Enter") void loginHost(); }}
             placeholder="Contraseña"
             type="password"
-            className="w-full mb-4 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400"
+            className="w-full mb-2 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400"
           />
+          <p className="mb-4 text-xs text-slate-400">{PASSWORD_HINT}</p>
           <button onClick={loginHost} disabled={loggingIn} className="w-full p-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 font-bold disabled:opacity-50">
             {loggingIn ? "Entrando..." : "Entrar"}
           </button>
@@ -151,6 +184,50 @@ export default function Host() {
           <p className="mt-6 text-center text-sm text-slate-400">
             ¿Olvidaste tu contraseña? Pídele a la administradora que te ayude a restablecerla.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hostUser.mustChangePassword) {
+    const fieldClass = "w-full mb-3 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400";
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white flex items-center justify-center p-6">
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md">
+          <h1 className="text-3xl font-bold mb-2">🔑 Elige tu nueva contraseña</h1>
+          <p className="text-slate-300 text-sm mb-6">
+            Entraste con una contraseña temporal. Antes de usar el panel, crea una que sí recuerdes.
+          </p>
+          {!knowsCurrent && (
+            <input
+              type="password"
+              placeholder="Contraseña temporal"
+              value={changeForm.current}
+              onChange={(e) => setChangeForm((current) => ({ ...current, current: e.target.value }))}
+              className={fieldClass}
+            />
+          )}
+          <input
+            type="password"
+            placeholder="Contraseña nueva"
+            value={changeForm.next}
+            onChange={(e) => setChangeForm((current) => ({ ...current, next: e.target.value }))}
+            className={fieldClass}
+          />
+          <input
+            type="password"
+            placeholder="Confirmar contraseña nueva"
+            value={changeForm.confirm}
+            onChange={(e) => setChangeForm((current) => ({ ...current, confirm: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === "Enter") void saveNewPassword(); }}
+            className={fieldClass}
+          />
+          <p className="mb-4 text-xs text-slate-400">{PASSWORD_HINT}</p>
+          <button onClick={saveNewPassword} disabled={changing} className="w-full p-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 font-bold disabled:opacity-50">
+            {changing ? "Guardando..." : "Guardar y continuar"}
+          </button>
+          {changeError && <p className="mt-4 text-red-300">{changeError}</p>}
+          <button onClick={logout} className="mt-4 w-full text-sm text-slate-400 hover:text-white">Salir</button>
         </div>
       </div>
     );

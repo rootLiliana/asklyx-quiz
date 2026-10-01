@@ -11,6 +11,7 @@ interface UserRow extends RowDataPacket {
   email: string;
   nickname: string;
   role: UserRole;
+  must_change_password: number | boolean;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -29,7 +30,7 @@ export interface UserRepository {
   findAll(role?: UserRole): Promise<User[]>;
 }
 
-const USER_COLUMNS = "id, name, last_name_paternal, last_name_maternal, email, nickname, role, created_at, updated_at";
+const USER_COLUMNS = "id, name, last_name_paternal, last_name_maternal, email, nickname, role, must_change_password, created_at, updated_at";
 
 function serializeDate(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : value;
@@ -44,6 +45,7 @@ function toUser(row: UserRow): User {
     email: row.email,
     nickname: row.nickname,
     role: row.role,
+    mustChangePassword: row.must_change_password === 1 || row.must_change_password === true,
     createdAt: serializeDate(row.created_at),
     updatedAt: serializeDate(row.updated_at),
   };
@@ -54,6 +56,30 @@ function toUserWithPasswordHash(row: UserAuthRow): UserWithPasswordHash {
     ...toUser(row),
     passwordHash: row.password_hash,
   };
+}
+
+// TiDB compara texto distinguiendo mayúsculas (collation utf8mb4_bin), pero
+// para las personas "Ana123" y "ana123" son lo mismo. Primero busca la
+// coincidencia exacta; si no hay, acepta la que difiere solo en mayúsculas,
+// siempre que sea UNA sola (si hubiera "Ana" y "ana", no adivina).
+async function findOneIgnoringCase<Row extends RowDataPacket>(
+  columns: string,
+  column: "nickname" | "email",
+  value: string,
+): Promise<Row | null> {
+  const [exact] = await getDatabasePool().execute<Row[]>(
+    `SELECT ${columns} FROM users WHERE ${column} = ? LIMIT 1`,
+    [value],
+  );
+  if (exact[0]) {
+    return exact[0];
+  }
+
+  const [similar] = await getDatabasePool().execute<Row[]>(
+    `SELECT ${columns} FROM users WHERE LOWER(${column}) = LOWER(?) LIMIT 2`,
+    [value],
+  );
+  return similar.length === 1 ? similar[0] ?? null : null;
 }
 
 export class MysqlUserRepository implements UserRepository {
@@ -85,32 +111,17 @@ export class MysqlUserRepository implements UserRepository {
   }
 
   async findByNickname(nickname: string): Promise<User | null> {
-    const [rows] = await getDatabasePool().execute<UserRow[]>(
-      `SELECT ${USER_COLUMNS} FROM users WHERE nickname = ? LIMIT 1`,
-      [nickname],
-    );
-
-    const row = rows[0];
+    const row = await findOneIgnoringCase<UserRow>(USER_COLUMNS, "nickname", nickname);
     return row ? toUser(row) : null;
   }
 
   async findAuthByNickname(nickname: string): Promise<UserWithPasswordHash | null> {
-    const [rows] = await getDatabasePool().execute<UserAuthRow[]>(
-      `SELECT ${USER_COLUMNS}, password_hash FROM users WHERE nickname = ? LIMIT 1`,
-      [nickname],
-    );
-
-    const row = rows[0];
+    const row = await findOneIgnoringCase<UserAuthRow>(`${USER_COLUMNS}, password_hash`, "nickname", nickname);
     return row ? toUserWithPasswordHash(row) : null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const [rows] = await getDatabasePool().execute<UserRow[]>(
-      `SELECT ${USER_COLUMNS} FROM users WHERE email = ? LIMIT 1`,
-      [email],
-    );
-
-    const row = rows[0];
+    const row = await findOneIgnoringCase<UserRow>(USER_COLUMNS, "email", email);
     return row ? toUser(row) : null;
   }
 

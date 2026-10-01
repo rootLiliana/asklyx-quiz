@@ -41,12 +41,14 @@ export class UserService {
     }
   }
 
-  async login(nickname: unknown, password: unknown): Promise<User> {
-    if (typeof nickname !== "string" || !nickname.trim() || typeof password !== "string" || !password) {
+  // `login` puede ser el nickname o el correo (sin importar mayúsculas):
+  // así quien olvidó su nickname puede entrar con su correo.
+  async login(login: unknown, password: unknown): Promise<User> {
+    if (typeof login !== "string" || !login.trim() || typeof password !== "string" || !password) {
       throw new UserInputError("nickname and password are required");
     }
 
-    const user = await this.users.findAuthByNickname(nickname.trim());
+    const user = await this.findAuthByLogin(login.trim());
 
     if (!user || !user.passwordHash) {
       // Ejecutamos una verificación contra un hash de referencia para que el
@@ -63,6 +65,15 @@ export class UserService {
 
     const { passwordHash: _passwordHash, ...publicUser } = user;
     return publicUser;
+  }
+
+  private async findAuthByLogin(login: string) {
+    if (!login.includes("@")) {
+      return this.users.findAuthByNickname(login);
+    }
+
+    const byEmail = await this.users.findByEmail(login.toLowerCase());
+    return byEmail?.nickname ? this.users.findAuthByNickname(byEmail.nickname) : null;
   }
 
   getById(id: string): Promise<User | null> {

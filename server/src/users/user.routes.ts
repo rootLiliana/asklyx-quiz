@@ -6,7 +6,9 @@ import {
   PasswordResetIdentityMismatchError,
   PasswordResetInputError,
   PasswordResetInvalidTokenError,
+  PasswordResetForbiddenError,
   PasswordResetTooManyAttemptsError,
+  PasswordResetUserNotFoundError,
   type PasswordResetService,
 } from "./password-reset.service.js";
 import {
@@ -169,6 +171,27 @@ export function createUserRouter(
     }
   });
 
+  // Solo admin: genera una contraseña temporal para dársela a la persona.
+  router.post("/:id/password-reset", guards.requireAdmin, async (req, res, next) => {
+    try {
+      res.json(await passwordResetService.adminReset(getPathId(req)));
+    } catch (error: unknown) {
+      if (error instanceof PasswordResetInputError) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+      if (error instanceof PasswordResetUserNotFoundError) {
+        res.status(404).json({ message: error.message });
+        return;
+      }
+      if (error instanceof PasswordResetForbiddenError) {
+        res.status(403).json({ message: error.message });
+        return;
+      }
+      next(error);
+    }
+  });
+
   router.patch("/:id/role", guards.requireAdmin, async (req, res, next) => {
     try {
       const user = await userService.changeRole(getPathId(req), asRecord(req.body).role);
@@ -212,6 +235,7 @@ export function toPublicUser(user: User) {
     email: user.email,
     nickname: user.nickname,
     role: user.role,
+    mustChangePassword: user.mustChangePassword ?? false,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

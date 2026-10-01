@@ -171,7 +171,7 @@ app.get("/health/db", async (_, res) => {
   }
 });
 
-app.use(createAuthRouter(userService, authSessions));
+app.use(createAuthRouter(userService, authSessions, passwordResetService));
 app.use("/users", createUserRouter(guards, userService, passwordResetService, authSessions));
 app.use("/groups", createGroupRouter(guards, groupService, classService));
 app.use("/classes", createClassRouter(guards, classService));

@@ -1,7 +1,7 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 
 import type { Mailer } from "../mailer.js";
-import { hashPassword } from "./password.js";
+import { hashPassword, verifyPassword } from "./password.js";
 import type { PasswordResetRepository } from "./password-reset.repository.js";
 import type { UserRepository } from "./user.repository.js";
 
@@ -11,6 +11,17 @@ export class PasswordResetInvalidTokenError extends Error {}
 // todos los casos, para no revelar cuál de los dos datos falló.
 export class PasswordResetIdentityMismatchError extends Error {}
 export class PasswordResetTooManyAttemptsError extends Error {}
+export class PasswordResetUserNotFoundError extends Error {}
+export class PasswordResetForbiddenError extends Error {}
+export class PasswordChangeWrongPasswordError extends Error {}
+
+// Sin caracteres que se confunden al dictarlos (0/O, 1/l/I).
+const TEMP_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+
+export function generateTemporaryPassword(): string {
+  const random = Array.from({ length: 6 }, () => TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)]).join("");
+  return `lili-${random}`;
+}
 
 export const RESET_TOKEN_TTL_MINUTES = 60;
 const MIN_PASSWORD_LENGTH = 8;
@@ -35,6 +46,53 @@ export class PasswordResetService {
     private readonly onPasswordChanged: (userId: string) => void = () => {},
     private readonly now: () => number = Date.now,
   ) {}
+
+  // La admin restablece la contraseña de una cuenta (alumno o host) y recibe
+  // una temporal para dársela a la persona. Nunca aplica a cuentas ADMIN.
+  async adminReset(userId: string): Promise<{ temporaryPassword: string }> {
+    if (!/^\d+$/.test(userId)) {
+      throw new PasswordResetInputError("id must be a positive integer");
+    }
+
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw new PasswordResetUserNotFoundError("User not found");
+    }
+    if (user.role === "ADMIN") {
+      throw new PasswordResetForbiddenError("ADMIN passwords cannot be reset from the app");
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    await this.resets.setPasswordHash(user.id, await hashPassword(temporaryPassword), true);
+    this.onPasswordChanged(user.id);
+
+    return { temporaryPassword };
+  }
+
+  // La persona (con su sesión) cambia su propia contraseña. Es lo que pide la
+  // app después de entrar con una contraseña temporal; quita la marca.
+  async changeOwnPassword(userId: string, currentPassword: unknown, newPassword: unknown): Promise<void> {
+    if (typeof currentPassword !== "string" || !currentPassword) {
+      throw new PasswordResetInputError("currentPassword is required");
+    }
+    if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
+      throw new PasswordResetInputError(`password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    }
+    if (newPassword === currentPassword) {
+      throw new PasswordResetInputError("the new password must be different from the current one");
+    }
+
+    const user = await this.users.findById(userId);
+    const withHash = user?.nickname ? await this.users.findAuthByNickname(user.nickname) : null;
+    if (!user || !withHash?.passwordHash || withHash.id !== user.id) {
+      throw new PasswordResetUserNotFoundError("User not found");
+    }
+    if (!(await verifyPassword(currentPassword, withHash.passwordHash))) {
+      throw new PasswordChangeWrongPasswordError("Current password is incorrect");
+    }
+
+    await this.resets.setPasswordHash(user.id, await hashPassword(newPassword), false);
+  }
 
   // Intentos fallidos de resetWithIdentity por correo (en memoria).
   private readonly directResetFailures = new Map<string, FailureWindow>();
@@ -69,7 +127,7 @@ export class PasswordResetService {
       throw new PasswordResetIdentityMismatchError("Email and nickname do not match a student account");
     }
 
-    await this.resets.setPasswordHash(user.id, await hashPassword(password));
+    await this.resets.setPasswordHash(user.id, await hashPassword(password), false);
     this.directResetFailures.delete(normalizedEmail);
     this.onPasswordChanged(user.id);
   }

@@ -14,6 +14,8 @@ export interface User {
   email: string;
   nickname: string;
   role: UserRole;
+  // La admin restableció su contraseña: debe elegir una nueva para continuar.
+  mustChangePassword?: boolean;
   createdAt: string;
   updatedAt: string;
 }

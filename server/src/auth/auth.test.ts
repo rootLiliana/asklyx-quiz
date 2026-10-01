@@ -151,3 +151,18 @@ test("the authenticated user comes from the session, never from the body", async
 
   assert.deepEqual(getAuthUser(req), ana);
 });
+
+test("with a temporary password, every guard answers PASSWORD_CHANGE_REQUIRED until it is changed", async () => {
+  const { repository, service } = build();
+  repository.users.set(ana.id, { ...ana, mustChangePassword: true });
+  const guards = createAuthGuards(service);
+  const token = await service.create(ana.id);
+
+  const blocked = await runGuard(guards.requireStudent, token);
+  assert.equal(blocked.nextCalled, false);
+  assert.equal(blocked.status, 403);
+
+  repository.users.set(ana.id, ana);
+  service.forgetCachedUser(ana.id);
+  assert.equal((await runGuard(guards.requireStudent, token)).nextCalled, true);
+});

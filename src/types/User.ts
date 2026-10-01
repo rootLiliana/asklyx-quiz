@@ -23,6 +23,8 @@ export interface PublicUser {
   email: string | null;
   nickname: string | null;
   role: UserRole;
+  // La admin restableció su contraseña: debe elegir una nueva antes de seguir.
+  mustChangePassword?: boolean;
   createdAt: string;
   updatedAt: string;
 }

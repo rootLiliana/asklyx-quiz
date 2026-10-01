@@ -6,8 +6,9 @@ import type { LoginResponse, LoginUserInput, PublicUser, RegisterUserInput } fro
 import { getTodayGroupName } from "../lib/studentGroup";
 import { inputClass, primaryButtonClass, secondaryButtonClass } from "../lib/authStyles";
 import { clearStudentSession } from "../lib/studentSession";
+import { changePassword, PASSWORD_HINT } from "../lib/changePassword";
 
-type Step = "landing" | "login" | "forgot" | "register" | "code";
+type Step = "landing" | "login" | "forgot" | "register" | "changePassword" | "code";
 
 interface StudentSession {
   token: string;
@@ -45,11 +46,22 @@ export default function Join() {
   const [codeFromUrl] = useState(() => searchParams.get("code"));
 
   const [studentSession, setStudentSession] = useState<StudentSession | null>(() => loadStudentSession());
-  const [step, setStep] = useState<Step>(() => (loadStudentSession() ? "code" : "landing"));
+  const [step, setStep] = useState<Step>(() => {
+    const saved = loadStudentSession();
+    if (!saved) return "landing";
+    return saved.user.mustChangePassword ? "changePassword" : "code";
+  });
 
   const [loginForm, setLoginForm] = useState({ nickname: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loginNotice, setLoginNotice] = useState("");
+
+  // Contraseña temporal (la admin la restableció): hay que elegir una nueva.
+  // `current` ya viene lleno si la acaba de escribir al iniciar sesión.
+  const [changeForm, setChangeForm] = useState({ current: "", next: "", confirm: "" });
+  const [knowsCurrent, setKnowsCurrent] = useState(false);
+  const [changeError, setChangeError] = useState("");
+  const [changing, setChanging] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
 
   const [forgotForm, setForgotForm] = useState({ email: "", nickname: "", password: "", confirmPassword: "" });
@@ -88,7 +100,7 @@ export default function Join() {
     const password = loginForm.password;
 
     if (!nickname || !password) {
-      setLoginError("Escribe tu nickname y tu contraseña.");
+      setLoginError("Escribe tu nickname (o correo) y tu contraseña.");
       return;
     }
 
@@ -110,6 +122,14 @@ export default function Join() {
       persistStudentSession(session);
       setStudentSession(session);
       setLoginForm({ nickname: "", password: "" });
+
+      if (data.user.mustChangePassword) {
+        setChangeForm({ current: password, next: "", confirm: "" });
+        setKnowsCurrent(true);
+        setChangeError("");
+        setStep("changePassword");
+        return;
+      }
       setStep("code");
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
@@ -292,6 +312,17 @@ export default function Join() {
         headers: { Authorization: `Bearer ${studentSession.token}` },
       });
 
+      if (response.status === 403) {
+        const body = await response.json().catch(() => null);
+        if (body?.code === "PASSWORD_CHANGE_REQUIRED") {
+          setChangeForm({ current: "", next: "", confirm: "" });
+          setKnowsCurrent(false);
+          setChangeError("");
+          setStep("changePassword");
+          return;
+        }
+      }
+
       if (response.status === 401 || response.status === 403) {
         clearStudentSession();
         setStudentSession(null);
@@ -320,6 +351,31 @@ export default function Join() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!studentSession) return;
+
+    setChanging(true);
+    setChangeError("");
+    const error = await changePassword(studentSession.token, changeForm.current, changeForm.next, changeForm.confirm);
+    setChanging(false);
+
+    if (error) {
+      setChangeError(error);
+      return;
+    }
+
+    const session: StudentSession = { ...studentSession, user: { ...studentSession.user, mustChangePassword: false } };
+    persistStudentSession(session);
+    setStudentSession(session);
+    setChangeForm({ current: "", next: "", confirm: "" });
+    setLoginNotice("✅ Listo, ya tienes tu contraseña nueva.");
+    setStep("code");
+  };
+
+  const updateChangeField = (field: keyof typeof changeForm) => (event: ChangeEvent<HTMLInputElement>) => {
+    setChangeForm((current) => ({ ...current, [field]: event.target.value }));
+  };
+
   const todayGroupName = getTodayGroupName();
   const groupMessage = todayGroupName
     ? `Hoy corresponde a ${todayGroupName}.`
@@ -338,6 +394,8 @@ export default function Join() {
         justify-center
         relative
         overflow-hidden
+        px-4
+        py-8
       "
     >
       {/* Anillo 1 */}
@@ -419,7 +477,8 @@ export default function Join() {
           z-10
           bg-white/10
           backdrop-blur-md
-          p-10
+          p-6
+          sm:p-10
           rounded-3xl
           shadow-2xl
           w-full
@@ -492,10 +551,10 @@ export default function Join() {
                 ← Volver
               </button>
 
-              <p className="text-white/70 text-sm mb-1">Nickname</p>
+              <p className="text-white/70 text-sm mb-1">Nickname o correo</p>
               <input
                 className={inputClass}
-                placeholder="Tu nickname"
+                placeholder="Tu nickname o tu correo"
                 value={loginForm.nickname}
                 onChange={updateLoginField("nickname")}
                 autoCapitalize="none"
@@ -513,6 +572,7 @@ export default function Join() {
                 enterKeyHint="go"
                 onKeyDown={(e) => { if (e.key === "Enter") void handleLogin(); }}
               />
+              <p className="-mt-2 mb-4 text-xs text-white/60">{PASSWORD_HINT}</p>
 
               {loginNotice && <p className="text-green-300 text-center mb-4">{loginNotice}</p>}
               {loginError && <p className="text-red-300 text-center mb-4">{loginError}</p>}
@@ -586,6 +646,7 @@ export default function Join() {
                 enterKeyHint="go"
                 onKeyDown={(e) => { if (e.key === "Enter") void handleForgotPassword(); }}
               />
+              <p className="-mt-2 mb-4 text-xs text-white/60">{PASSWORD_HINT}</p>
 
               {forgotError && <p className="text-red-300 text-center mb-4">{forgotError}</p>}
 
@@ -667,6 +728,7 @@ export default function Join() {
                 enterKeyHint="go"
                 onKeyDown={(e) => { if (e.key === "Enter") void handleRegister(); }}
               />
+              <p className="-mt-2 mb-4 text-xs text-white/60">{PASSWORD_HINT}</p>
 
               {registerError && (
                 <p className="text-red-300 text-center mb-4">{registerError}</p>
@@ -674,6 +736,54 @@ export default function Join() {
 
               <button onClick={handleRegister} disabled={registering} className={primaryButtonClass}>
                 {registering ? "Creando cuenta..." : "Crear cuenta"}
+              </button>
+            </motion.div>
+          )}
+
+          {step === "changePassword" && studentSession && (
+            <motion.div
+              key="changePassword"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <p className="text-white text-2xl font-bold text-center mb-2">🔑 Elige tu nueva contraseña</p>
+              <p className="text-white/80 text-center mb-6">
+                Entraste con una contraseña temporal. Antes de jugar, crea una que sí recuerdes.
+              </p>
+
+              {!knowsCurrent && (
+                <input
+                  className={inputClass}
+                  placeholder="Contraseña temporal"
+                  type="password"
+                  value={changeForm.current}
+                  onChange={updateChangeField("current")}
+                />
+              )}
+              <input
+                className={inputClass}
+                placeholder="Contraseña nueva"
+                type="password"
+                value={changeForm.next}
+                onChange={updateChangeField("next")}
+              />
+              <input
+                className={inputClass}
+                placeholder="Confirmar contraseña nueva"
+                type="password"
+                value={changeForm.confirm}
+                onChange={updateChangeField("confirm")}
+                enterKeyHint="go"
+                onKeyDown={(e) => { if (e.key === "Enter") void handleChangePassword(); }}
+              />
+              <p className="-mt-2 mb-4 text-xs text-white/60">{PASSWORD_HINT}</p>
+
+              {changeError && <p className="text-red-300 text-center mb-4">{changeError}</p>}
+
+              <button onClick={handleChangePassword} disabled={changing} className={primaryButtonClass}>
+                {changing ? "Guardando..." : "Guardar y continuar"}
               </button>
             </motion.div>
           )}
@@ -690,6 +800,7 @@ export default function Join() {
                 ¡Hola, {studentSession.user.nickname}! 👋
               </p>
               <p className="text-white/70 text-center mb-6">{groupMessage}</p>
+              {loginNotice && <p className="text-green-300 text-center mb-4">{loginNotice}</p>}
 
               <p className="text-white/70 text-sm mb-4 text-center">
                 Entrando como: <span className="font-semibold text-white">{studentSession.user.nickname}</span>
@@ -725,7 +836,7 @@ function mapLoginError(status: number): string {
     return "Esta cuenta es de Host: entra desde el panel de Host (/host).";
   }
   if (status === 401) {
-    return "Nickname o contraseña incorrectos.";
+    return "Nickname/correo o contraseña incorrectos. Recuerda que la contraseña distingue mayúsculas.";
   }
   if (status === 400) {
     return "Escribe tu nickname y tu contraseña.";
