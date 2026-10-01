@@ -10,9 +10,9 @@ const ROLE_STYLE: Record<UserRole, string> = {
   ADMIN: "bg-yellow-500/20 text-yellow-200",
 };
 
-// Solo admin. Una host se registra como cualquier alumna y aquí se le da el
-// rol HOST. El rol ADMIN no se cambia desde la app.
-export default function UsersPanel({ api }: { api: HostFetch }) {
+// Las hosts solo ven la lista. La admin además da o quita el rol HOST y
+// restablece contraseñas. El rol ADMIN no se cambia desde la app.
+export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: boolean }) {
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
@@ -115,7 +115,11 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
       <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
         <div>
           <h2 className="text-2xl font-bold">Usuarias</h2>
-          <p className="text-sm text-slate-400">Para agregar una Host: que se registre como alumno y aquí le das acceso.</p>
+          <p className="text-sm text-slate-400">
+            {canEdit
+              ? "Para agregar una Host: que se registre como alumno y aquí le das acceso."
+              : "Solo lectura: la administradora es quien restablece contraseñas y da acceso de Host."}
+          </p>
         </div>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, nickname o correo..." className={`${fieldClass} md:max-w-sm`} />
       </div>
@@ -123,7 +127,7 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
       {error && <p className="text-red-300 mb-3">{error}</p>}
       {!loaded && <p className="text-slate-400">Cargando...</p>}
 
-      {resetResult && (
+      {canEdit && resetResult && (
         <div className="mb-5 rounded-2xl border border-yellow-300/40 bg-yellow-500/10 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -166,17 +170,17 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
                   )}
                 </td>
                 <td className="py-3 text-right whitespace-nowrap">
-                  {user.role !== "ADMIN" && (
+                  {canEdit && user.role !== "ADMIN" && (
                     <button onClick={() => void resetPassword(user)} disabled={savingUserId === user.id} className="mr-2 rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1 disabled:opacity-50" title="Restablecer contraseña">
                       🔑 Restablecer
                     </button>
                   )}
-                  {user.role === "STUDENT" && (
+                  {canEdit && user.role === "STUDENT" && (
                     <button onClick={() => void changeRole(user, "HOST")} disabled={savingUserId === user.id} className="rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 px-3 py-1 disabled:opacity-50">
                       Hacer Host
                     </button>
                   )}
-                  {user.role === "HOST" && (
+                  {canEdit && user.role === "HOST" && (
                     <button onClick={() => void changeRole(user, "STUDENT")} disabled={savingUserId === user.id} className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1 disabled:opacity-50">
                       Quitar Host
                     </button>
