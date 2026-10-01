@@ -8,6 +8,7 @@ interface SessionUserRow extends RowDataPacket {
   user_id: number | string;
   nickname: string;
   role: UserRole;
+  must_change_password: number | boolean;
 }
 
 export interface AuthSessionRepository {
@@ -30,7 +31,7 @@ export class MysqlAuthSessionRepository implements AuthSessionRepository {
 
   async findUserByTokenHash(tokenHash: string): Promise<AuthUser | null> {
     const [rows] = await getDatabasePool().execute<SessionUserRow[]>(
-      `SELECT s.user_id, u.nickname, u.role
+      `SELECT s.user_id, u.nickname, u.role, u.must_change_password
        FROM auth_sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > CURRENT_TIMESTAMP
@@ -39,7 +40,14 @@ export class MysqlAuthSessionRepository implements AuthSessionRepository {
     );
 
     const row = rows[0];
-    return row ? { id: String(row.user_id), nickname: row.nickname, role: row.role } : null;
+    return row
+      ? {
+          id: String(row.user_id),
+          nickname: row.nickname,
+          role: row.role,
+          mustChangePassword: row.must_change_password === 1 || row.must_change_password === true,
+        }
+      : null;
   }
 
   async deleteByTokenHash(tokenHash: string): Promise<void> {

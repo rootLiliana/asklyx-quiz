@@ -40,6 +40,12 @@ export function createAuthGuards(sessions: AuthSessionService): AuthGuards {
           res.status(403).json({ message: "Forbidden" });
           return;
         }
+        // Con contraseña temporal solo se puede cambiar la contraseña
+        // (POST /auth/change-password, que no pasa por estos guards).
+        if (user.mustChangePassword) {
+          res.status(403).json({ code: "PASSWORD_CHANGE_REQUIRED", message: "Password change required" });
+          return;
+        }
 
         (req as AuthenticatedRequest).authUser = user;
         next();

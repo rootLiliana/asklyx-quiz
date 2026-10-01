@@ -6,4 +6,5 @@ export interface AuthUser {
   id: string;
   nickname: string;
   role: UserRole;
+  mustChangePassword?: boolean;
 }

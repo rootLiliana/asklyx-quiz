@@ -11,7 +11,10 @@ import {
   PasswordResetInputError,
   PasswordResetInvalidTokenError,
   PasswordResetService,
+  PasswordChangeWrongPasswordError,
+  PasswordResetForbiddenError,
   PasswordResetTooManyAttemptsError,
+  PasswordResetUserNotFoundError,
 } from "./password-reset.service.js";
 import type { UserRepository } from "./user.repository.js";
 import type { User, UserRole, UserWithPasswordHash } from "./user.types.js";
@@ -54,8 +57,11 @@ class FakeResetRepository implements PasswordResetRepository {
     this.tokens.set(tokenHash, { userId, used: false });
   }
 
-  async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
+  mustChange = new Map<string, boolean>();
+
+  async setPasswordHash(userId: string, passwordHash: string, mustChange: boolean): Promise<void> {
     this.passwordHashes.set(userId, passwordHash);
+    this.mustChange.set(userId, mustChange);
   }
 
   async consumeAndSetPassword(tokenHash: string, passwordHash: string): Promise<string | null> {
@@ -211,4 +217,62 @@ test("resetWithIdentity locks an email after too many failed attempts, even with
 
   advance(15 * 60_000);
   await assert.doesNotReject(service.resetWithIdentity(ana.email, ana.nickname, "NuevaClave123"));
+});
+
+test("adminReset gives a readable temporary password, stores only its hash and closes open sessions", async () => {
+  const { service, resets, revoked } = buildService();
+
+  const { temporaryPassword } = await service.adminReset(ana.id);
+
+  assert.match(temporaryPassword, /^lili-[a-z2-9]{6}$/);
+  assert.equal(resets.mustChange.get(ana.id), true);
+  const storedHash = resets.passwordHashes.get(ana.id);
+  assert.ok(storedHash);
+  assert.notEqual(storedHash, temporaryPassword);
+  assert.equal(await verifyPassword(temporaryPassword, storedHash), true);
+  assert.deepEqual(revoked, [ana.id]);
+});
+
+test("adminReset never applies to ADMIN accounts and rejects unknown users", async () => {
+  const users = new FakeUserRepository();
+  users.findById = async (id?: string): Promise<User | null> => (id === "1" ? { ...ana, id: "1", role: "ADMIN" } : null);
+  const service = new PasswordResetService(users, new FakeResetRepository(), new FakeMailer(), "https://x");
+
+  await assert.rejects(service.adminReset("1"), PasswordResetForbiddenError);
+  await assert.rejects(service.adminReset("999"), PasswordResetUserNotFoundError);
+  await assert.rejects(service.adminReset("abc"), PasswordResetInputError);
+});
+
+// Usuario cuya contraseña vive en el FakeResetRepository (para changeOwnPassword).
+function buildWithStoredPassword() {
+  const resets = new FakeResetRepository();
+  const users = new FakeUserRepository();
+  users.findAuthByNickname = async (): Promise<UserWithPasswordHash | null> => ({ ...ana, passwordHash: resets.passwordHashes.get(ana.id) ?? null });
+  const service = new PasswordResetService(users, resets, new FakeMailer(), "https://x");
+  return { service, resets };
+}
+
+test("after an admin reset, changeOwnPassword sets the new password and clears the temporary mark", async () => {
+  const { service, resets } = buildWithStoredPassword();
+  const { temporaryPassword } = await service.adminReset(ana.id);
+
+  await service.changeOwnPassword(ana.id, temporaryPassword, "MiClaveNueva9");
+
+  assert.equal(resets.mustChange.get(ana.id), false);
+  assert.equal(await verifyPassword("MiClaveNueva9", resets.passwordHashes.get(ana.id) ?? ""), true);
+});
+
+test("changeOwnPassword requires the current password and a different, long enough new one", async () => {
+  const { service } = buildWithStoredPassword();
+  const { temporaryPassword } = await service.adminReset(ana.id);
+
+  await assert.rejects(service.changeOwnPassword(ana.id, "equivocada", "MiClaveNueva9"), PasswordChangeWrongPasswordError);
+  await assert.rejects(service.changeOwnPassword(ana.id, temporaryPassword, "corta"), PasswordResetInputError);
+  await assert.rejects(service.changeOwnPassword(ana.id, temporaryPassword, temporaryPassword), PasswordResetInputError);
+});
+
+test("the email + nickname recovery never leaves the password marked as temporary", async () => {
+  const { service, resets } = buildService();
+  await service.resetWithIdentity(ana.email, ana.nickname, "NuevaClave123");
+  assert.equal(resets.mustChange.get(ana.id), false);
 });

@@ -321,3 +321,19 @@ test("register rejects a name or nickname longer than the users table columns al
     service.register({ name: "A".repeat(150), lastNamePaternal: "Pérez", email: "ana@example.com", nickname: "n".repeat(50), password: VALID_PASSWORD }),
   );
 });
+
+test("login also accepts the email instead of the nickname", async () => {
+  const repository = new FakeUserRepository();
+  const service = new UserService(repository);
+  const registered = await service.register({ name: "Ana", lastNamePaternal: "Pérez", email: "ana@example.com", nickname: "ana123", password: VALID_PASSWORD });
+  repository.findByEmail = async (email?: string) => (email === "ana@example.com" ? registered : null);
+
+  const user = await service.login("  ANA@example.com ", VALID_PASSWORD);
+
+  assert.equal(user.nickname, "ana123");
+});
+
+test("login with an unknown email fails like a wrong password", async () => {
+  const service = new UserService(new FakeUserRepository());
+  await assert.rejects(service.login("nadie@example.com", VALID_PASSWORD), InvalidCredentialsError);
+});

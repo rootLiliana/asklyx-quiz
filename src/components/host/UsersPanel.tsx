@@ -18,6 +18,8 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [savingUserId, setSavingUserId] = useState("");
+  const [resetResult, setResetResult] = useState<{ user: PublicUser; temporaryPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +62,45 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
     }
   };
 
+  // Genera una contraseña temporal; al entrar con ella, la app le pide elegir una nueva.
+  const resetPassword = async (user: PublicUser) => {
+    const who = user.nickname ?? user.name;
+    if (!window.confirm(`¿Restablecer la contraseña de ${who}? Su contraseña actual dejará de funcionar.`)) return;
+
+    setSavingUserId(user.id);
+    setError("");
+    setCopied(false);
+    try {
+      const response = await api(`/users/${user.id}/password-reset`, { method: "POST" });
+      if (!response.ok) {
+        setError("No pudimos restablecer la contraseña.");
+        return;
+      }
+      const { temporaryPassword }: { temporaryPassword: string } = await response.json();
+      setResetResult({ user, temporaryPassword });
+      setUsers((current) => current.map((item) => (item.id === user.id ? { ...item, mustChangePassword: true } : item)));
+    } finally {
+      setSavingUserId("");
+    }
+  };
+
+  const resetMessage = resetResult
+    ? `Hola ${resetResult.user.name}, restablecí tu contraseña de Lilihoot. ` +
+      `Entra con tu correo (${resetResult.user.email ?? "—"})` +
+      (resetResult.user.nickname ? ` o tu nickname (${resetResult.user.nickname})` : "") +
+      ` y esta contraseña temporal: ${resetResult.temporaryPassword} — al entrar te pedirá elegir una nueva. ` +
+      "Ojo: la contraseña distingue mayúsculas, minúsculas y signos."
+    : "";
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(resetMessage);
+      setCopied(true);
+    } catch {
+      setError("No se pudo copiar automáticamente: selecciona el texto y cópialo.");
+    }
+  };
+
   const normalizedSearch = search.trim().toLowerCase();
   const visibleUsers = users
     .filter((user) =>
@@ -82,6 +123,23 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
       {error && <p className="text-red-300 mb-3">{error}</p>}
       {!loaded && <p className="text-slate-400">Cargando...</p>}
 
+      {resetResult && (
+        <div className="mb-5 rounded-2xl border border-yellow-300/40 bg-yellow-500/10 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-bold">🔑 Contraseña temporal de {resetResult.user.nickname ?? resetResult.user.name}</p>
+              <p className="mt-1 font-mono text-2xl font-black tracking-wider text-yellow-200 select-all">{resetResult.temporaryPassword}</p>
+            </div>
+            <button onClick={() => setResetResult(null)} className="text-sm text-slate-400 hover:text-white">Cerrar ✕</button>
+          </div>
+          <p className="mt-3 rounded-xl bg-black/30 p-3 text-sm text-slate-200 select-all break-words">{resetMessage}</p>
+          <button onClick={() => void copyMessage()} className="mt-3 rounded-xl bg-yellow-400 px-4 py-2 font-bold text-purple-950 hover:bg-yellow-300">
+            {copied ? "✅ Mensaje copiado" : "📋 Copiar mensaje"}
+          </button>
+          <p className="mt-2 text-xs text-slate-400">La contraseña solo se muestra ahora. Si la pierdes, restablécela otra vez.</p>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-slate-400">
@@ -101,8 +159,18 @@ export default function UsersPanel({ api }: { api: HostFetch }) {
                 <td className="py-3 pr-4 text-slate-400">{user.email ?? "—"}</td>
                 <td className="py-3 pr-4">
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ROLE_STYLE[user.role]}`}>{ROLE_LABEL[user.role]}</span>
+                  {user.mustChangePassword && (
+                    <span className="ml-2 rounded-full bg-yellow-500/20 px-2 py-1 text-xs text-yellow-200" title="Todavía no elige su contraseña nueva">
+                      🔑 temporal
+                    </span>
+                  )}
                 </td>
                 <td className="py-3 text-right whitespace-nowrap">
+                  {user.role !== "ADMIN" && (
+                    <button onClick={() => void resetPassword(user)} disabled={savingUserId === user.id} className="mr-2 rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1 disabled:opacity-50" title="Restablecer contraseña">
+                      🔑 Restablecer
+                    </button>
+                  )}
                   {user.role === "STUDENT" && (
                     <button onClick={() => void changeRole(user, "HOST")} disabled={savingUserId === user.id} className="rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 px-3 py-1 disabled:opacity-50">
                       Hacer Host
