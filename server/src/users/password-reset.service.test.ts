@@ -276,3 +276,14 @@ test("the email + nickname recovery never leaves the password marked as temporar
   await service.resetWithIdentity(ana.email, ana.nickname, "NuevaClave123");
   assert.equal(resets.mustChange.get(ana.id), false);
 });
+
+test("a host can reset a student's password but never another host's", async () => {
+  const users = new FakeUserRepository();
+  const hostAccount: User = { ...ana, id: "2", role: "HOST" };
+  users.findById = async (id?: string): Promise<User | null> => (id === ana.id ? ana : id === "2" ? hostAccount : null);
+  const service = new PasswordResetService(users, new FakeResetRepository(), new FakeMailer(), "https://x");
+
+  await assert.doesNotReject(service.adminReset(ana.id, "HOST"));
+  await assert.rejects(service.adminReset("2", "HOST"), PasswordResetForbiddenError);
+  await assert.doesNotReject(service.adminReset("2", "ADMIN"));
+});

@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 
-import type { AuthGuards } from "../auth/auth.middleware.js";
+import { getAuthUser, type AuthGuards } from "../auth/auth.middleware.js";
 import type { AuthSessionService } from "../auth/auth-session.service.js";
 import {
   PasswordResetIdentityMismatchError,
@@ -172,10 +172,11 @@ export function createUserRouter(
     }
   });
 
-  // Solo admin: genera una contraseña temporal para dársela a la persona.
-  router.post("/:id/password-reset", guards.requireAdmin, async (req, res, next) => {
+  // Hosts (solo cuentas de alumno) y admin: genera una contraseña temporal
+  // para dársela a la persona.
+  router.post("/:id/password-reset", guards.requireHost, async (req, res, next) => {
     try {
-      res.json(await passwordResetService.adminReset(getPathId(req)));
+      res.json(await passwordResetService.adminReset(getPathId(req), getAuthUser(req)?.role ?? "STUDENT"));
     } catch (error: unknown) {
       if (error instanceof PasswordResetInputError) {
         res.status(400).json({ message: error.message });

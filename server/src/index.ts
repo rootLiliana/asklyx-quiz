@@ -19,7 +19,10 @@ import { createGame,
   getIcebreaker, 
   submitIcebreakerAnswer, 
   closeIcebreaker,
-  getGameStats
+  getGameStats,
+  DEFAULT_QUESTION_SECONDS,
+  MIN_QUESTION_SECONDS,
+  MAX_QUESTION_SECONDS,
  } from "./gameManager.js";
 import { loadEnvFile } from "./env.js";
 import { checkDatabaseConnection } from "./db.js";
@@ -114,6 +117,7 @@ interface CreateGameRequest {
   quizId: string;
   classId: string;
   mode: QuizSessionMode;
+  durationSeconds: number;
 }
 
 class CreateGameRequestError extends Error {}
@@ -131,7 +135,17 @@ function parseCreateGameRequest(body: unknown): CreateGameRequest {
     throw new CreateGameRequestError("mode must be OFFICIAL or PRACTICE");
   }
 
-  return { quizId, classId, mode: mode as QuizSessionMode };
+  const durationSeconds = record.durationSeconds === undefined ? DEFAULT_QUESTION_SECONDS : record.durationSeconds;
+  if (
+    typeof durationSeconds !== "number" ||
+    !Number.isInteger(durationSeconds) ||
+    durationSeconds < MIN_QUESTION_SECONDS ||
+    durationSeconds > MAX_QUESTION_SECONDS
+  ) {
+    throw new CreateGameRequestError(`durationSeconds must be an integer between ${MIN_QUESTION_SECONDS} and ${MAX_QUESTION_SECONDS}`);
+  }
+
+  return { quizId, classId, mode: mode as QuizSessionMode, durationSeconds };
 }
 
 function parsePositiveId(value: unknown, name: string): string {
@@ -209,7 +223,7 @@ app.post("/games", requireHost, async (req, res, next) => {
       return;
     }
 
-    const createdGame = createGame(toGameManagerQuestions(quiz));
+    const createdGame = createGame(toGameManagerQuestions(quiz), request.durationSeconds);
 
     try {
       await quizSessionService.create({

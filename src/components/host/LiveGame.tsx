@@ -12,6 +12,7 @@ interface QuestionStat {
   percentage: number;
 }
 
+// Respaldo: el juego siempre trae sus segundos por pregunta (los elige la host).
 const QUESTION_DURATION_SECONDS = 22;
 
 interface LiveGameProps {
@@ -141,7 +142,7 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 rounded-2xl bg-white/5 border border-white/10 px-5 py-3">
         <p className="text-sm">
           <span className="font-semibold">{info.quizTitle}</span>
-          <span className="text-slate-400"> · {info.groupName} · {formatClassDate(info.classDate)} — {info.className}</span>
+          <span className="text-slate-400"> · {info.groupName} · {formatClassDate(info.classDate)} — {info.className} · ⏱️ {info.durationSeconds} s por pregunta</span>
         </p>
         <button onClick={exit} className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-2 text-sm">
           {finished ? "✓ Nueva sesión" : "Terminar sesión"}
