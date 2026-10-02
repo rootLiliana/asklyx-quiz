@@ -152,3 +152,23 @@ test("the public leaderboard only has id, name and score, sorted by score", () =
   assert.deepEqual(leaderboard?.map((player) => player.name), ["luis", "ana"]);
   assert.deepEqual(Object.keys(leaderboard?.[0] ?? {}).sort(), ["id", "name", "score"]);
 });
+
+test("the host can choose the seconds per question when creating the game", () => {
+  const game = createGame([question("q1")], 45);
+  startGame(game.code, 0);
+
+  const current = getCurrentQuestion(game.code, 0);
+  assert.ok(current && "remainingSeconds" in current);
+  assert.equal(current.durationSeconds, 45);
+  assert.equal(current.remainingSeconds, 45);
+});
+
+test("with more seconds per question, a fast correct answer can score more", () => {
+  const game = createGame([question("q1")], 60);
+  joinGame(game.code, "ana");
+  startGame(game.code, 0);
+
+  const result = submitAnswer(game.code, "ana", "q1", 1, 10_000);
+
+  assert.equal(result.status === "OK" && result.score, 5000); // 50 s restantes x 100
+});

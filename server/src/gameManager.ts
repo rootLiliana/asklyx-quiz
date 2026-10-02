@@ -5,7 +5,9 @@ import type { Question } from "./types/Question.js";
 
 
 const games = new Map<string, Game>();
-const QUESTION_DURATION_SECONDS = 22;
+export const DEFAULT_QUESTION_SECONDS = 22;
+export const MIN_QUESTION_SECONDS = 5;
+export const MAX_QUESTION_SECONDS = 300;
 
 function cloneQuestions(
   questions: Question[]
@@ -18,8 +20,11 @@ function cloneQuestions(
 }
 
 // Las preguntas siempre vienen de un quiz guardado en la BD.
+// La host elige los segundos por pregunta al crear el juego (más tiempo =
+// más puntos posibles, es intencional).
 export function createGame(
   suppliedQuestions: Question[],
+  questionDurationSeconds: number = DEFAULT_QUESTION_SECONDS,
 ) {
   const questions = cloneQuestions(suppliedQuestions);
 
@@ -30,7 +35,7 @@ export function createGame(
   players: [],
   questions,
   currentQuestion: -1,
-  questionDurationSeconds: QUESTION_DURATION_SECONDS,
+  questionDurationSeconds,
 };
 
   games.set(code, game);

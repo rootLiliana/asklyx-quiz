@@ -4,6 +4,7 @@ import type { Mailer } from "../mailer.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import type { PasswordResetRepository } from "./password-reset.repository.js";
 import type { UserRepository } from "./user.repository.js";
+import type { UserRole } from "./user.types.js";
 
 export class PasswordResetInputError extends Error {}
 export class PasswordResetInvalidTokenError extends Error {}
@@ -47,9 +48,10 @@ export class PasswordResetService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  // La admin restablece la contraseña de una cuenta (alumno o host) y recibe
-  // una temporal para dársela a la persona. Nunca aplica a cuentas ADMIN.
-  async adminReset(userId: string): Promise<{ temporaryPassword: string }> {
+  // Una host o la admin restablece la contraseña de una cuenta y recibe una
+  // temporal para dársela a la persona. Las hosts solo pueden hacerlo con
+  // cuentas de alumno; la admin también con hosts. Nunca con cuentas ADMIN.
+  async adminReset(userId: string, actorRole: UserRole = "ADMIN"): Promise<{ temporaryPassword: string }> {
     if (!/^\d+$/.test(userId)) {
       throw new PasswordResetInputError("id must be a positive integer");
     }
@@ -60,6 +62,9 @@ export class PasswordResetService {
     }
     if (user.role === "ADMIN") {
       throw new PasswordResetForbiddenError("ADMIN passwords cannot be reset from the app");
+    }
+    if (actorRole !== "ADMIN" && user.role !== "STUDENT") {
+      throw new PasswordResetForbiddenError("Hosts can only reset student passwords");
     }
 
     const temporaryPassword = generateTemporaryPassword();
