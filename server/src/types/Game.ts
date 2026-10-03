@@ -10,6 +10,8 @@ export interface Game {
   // Momento (ms) en que empezó la pregunta actual: el tiempo lo mide el
   // servidor, nunca el navegador.
   questionStartedAt?: number;
+  // Cuándo se inició el juego (started_at de cada intento guardado).
+  startedAt?: number;
   icebreaker?: IceBreaker;
 }
 

@@ -1,7 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { getDatabasePool } from "../db.js";
-import type { CreateQuizSessionInput, QuizSession, QuizSessionMode } from "./quiz-session.types.js";
+import type { CreateQuizSessionInput, QuizSession, QuizSessionMode, QuizSessionStatus } from "./quiz-session.types.js";
 
 interface QuizSessionRow extends RowDataPacket {
   id: number | string;
@@ -17,6 +17,10 @@ interface QuizSessionRow extends RowDataPacket {
 export interface QuizSessionRepository {
   create(input: CreateQuizSessionInput): Promise<QuizSession>;
   findByGameCode(gameCode: string): Promise<QuizSession | null>;
+  // WAITING -> IN_PROGRESS (+ started_at). Solo la primera vez.
+  markStarted(gameCode: string): Promise<void>;
+  // -> FINISHED (+ ended_at). Solo la primera vez.
+  markFinished(gameCode: string): Promise<void>;
 }
 
 export class QuizSessionConflictError extends Error {}
@@ -31,13 +35,29 @@ function toQuizSession(row: QuizSessionRow): QuizSession {
     groupId: row.group_id === null ? null : String(row.group_id),
     gameCode: row.game_code,
     mode: row.mode,
-    // El status solo se escribe como 'WAITING' hoy (create() lo hardcodea) y
-    // nunca se actualiza; se modela así hasta que exista una transición real.
-    status: "WAITING",
+    status: toStatus(row.status),
   };
 }
 
+function toStatus(value: string): QuizSessionStatus {
+  return value === "IN_PROGRESS" || value === "FINISHED" ? value : "WAITING";
+}
+
 export class MysqlQuizSessionRepository implements QuizSessionRepository {
+  async markStarted(gameCode: string): Promise<void> {
+    await getDatabasePool().execute<ResultSetHeader>(
+      "UPDATE quiz_sessions SET status = 'IN_PROGRESS', started_at = CURRENT_TIMESTAMP WHERE game_code = ? AND status = 'WAITING'",
+      [gameCode],
+    );
+  }
+
+  async markFinished(gameCode: string): Promise<void> {
+    await getDatabasePool().execute<ResultSetHeader>(
+      "UPDATE quiz_sessions SET status = 'FINISHED', ended_at = CURRENT_TIMESTAMP WHERE game_code = ? AND status <> 'FINISHED'",
+      [gameCode],
+    );
+  }
+
   async findByGameCode(gameCode: string): Promise<QuizSession | null> {
     const [rows] = await getDatabasePool().execute<QuizSessionRow[]>(
       "SELECT id, quiz_id, host_id, class_id, group_id, game_code, mode, status FROM quiz_sessions WHERE game_code = ? LIMIT 1",

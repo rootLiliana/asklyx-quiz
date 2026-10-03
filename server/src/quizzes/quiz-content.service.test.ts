@@ -7,6 +7,7 @@ import type { Question } from "../types/Question.js";
 import {
   QuizContentClassNotFoundError,
   QuizContentInputError,
+  QuizContentHasResultsError,
   QuizContentNotFoundError,
   QuizContentService,
 } from "./quiz-content.service.js";
@@ -79,6 +80,9 @@ class FakeQuizContentRepository implements QuizContentRepository {
   }
 
   async findAll(): Promise<QuizSummary[]> { return []; }
+
+  played = false;
+  async hasResults(): Promise<boolean> { return this.played; }
 
   async findById(id: string): Promise<QuizContent | null> {
     return this.quiz?.id === id ? this.quiz : null;
@@ -160,6 +164,8 @@ test("retrieves a quiz and reconstructs Game Manager Question[]", async () => {
     "Sí es correcta.",
   ]);
   assert.deepEqual(reconstructed?.map((question) => question.answers), [[0, 0, 0], [0, 0]]);
+  // Los ids reales de las opciones viajan con la pregunta para guardar la opción elegida.
+  assert.deepEqual(reconstructed?.map((question) => question.optionIds?.length), [3, 2]);
 });
 
 test("create saves the quiz associated with the selected classId", async () => {
@@ -238,4 +244,23 @@ test("delete removes a saved quiz and rejects an unknown one", async () => {
 test("list rejects a non-numeric classId filter", () => {
   const service = buildService();
   assert.throws(() => service.list("abc"), QuizContentInputError);
+});
+
+test("a quiz that already has results cannot be edited or deleted (it is saved as a copy instead)", async () => {
+  const repository = new FakeQuizContentRepository();
+  const service = buildService(repository);
+  await service.create({ classId: existingClass.id, title: "Python", createdBy: "2", questions });
+  repository.played = true;
+
+  await assert.rejects(
+    service.update("900", { classId: existingClass.id, title: "Python v2", createdBy: "2", questions }),
+    QuizContentHasResultsError,
+  );
+  await assert.rejects(service.delete("900"), QuizContentHasResultsError);
+  assert.equal((await service.getById("900"))?.title, "Python");
+
+  // La copia es un quiz nuevo con el contenido editado.
+  const copy = await service.create({ classId: existingClass.id, title: "Python (copia)", createdBy: "2", questions: [questions[0]!] });
+  assert.equal(copy.title, "Python (copia)");
+  assert.equal(copy.questions.length, 1);
 });

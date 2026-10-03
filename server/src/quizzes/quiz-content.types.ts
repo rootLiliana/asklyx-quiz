@@ -30,6 +30,8 @@ export interface QuizSummary {
   groupId: string;
   groupName: string | null;
   questionCount: number;
+  // Ya se jugó y tiene resultados guardados: no se edita ni se borra.
+  hasResults: boolean;
 }
 
 export interface StoredQuestion {

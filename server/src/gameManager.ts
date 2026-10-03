@@ -15,6 +15,7 @@ function cloneQuestions(
   return questions.map(question => ({
     ...question,
     options: [...question.options],
+    ...(question.optionIds ? { optionIds: [...question.optionIds] } : {}),
     answers: [...question.answers],
   }));
 }
@@ -78,6 +79,7 @@ export function joinGame(code: string, playerName: string) {
       name: playerName,
       score: 0,
       answeredQuestions: [],
+      answers: [],
     };
     game.players.push(player);
   }
@@ -97,6 +99,7 @@ export function startGame(code: string, now: number = Date.now()) {
   if (game.currentQuestion < 0) {
     game.currentQuestion = 0;
     game.questionStartedAt = now;
+    game.startedAt = now;
   }
 
   return game;
@@ -193,10 +196,12 @@ export function submitAnswer(
   const remaining = remainingMs(game, now);
   const timeUp = remaining <= -ANSWER_GRACE_MS;
   const validAnswer = Number.isInteger(answer) && answer >= 0 && answer < question.options.length;
+  const responseMs = Math.max(0, game.questionDurationSeconds * 1000 - remaining);
 
   player.answeredQuestions.push(question.id);
 
   if (timeUp || !validAnswer) {
+    player.answers.push({ questionId: question.id, optionIndex: null, correct: false, points: 0, responseMs });
     return { status: "OK", correct: false, alreadyAnswered: false, timeUp, score: player.score, ...reveal };
   }
 
@@ -204,10 +209,11 @@ export function submitAnswer(
   question.answers[answer] = (question.answers[answer] ?? 0) + 1;
 
   const correct = answer === question.correctAnswer;
-  if (correct) {
-    const secondsLeft = Math.min(Math.max(0, Math.ceil(remaining / 1000)), game.questionDurationSeconds);
-    player.score += secondsLeft * 100;
-  }
+  const points = correct
+    ? Math.min(Math.max(0, Math.ceil(remaining / 1000)), game.questionDurationSeconds) * 100
+    : 0;
+  player.score += points;
+  player.answers.push({ questionId: question.id, optionIndex: answer, correct, points, responseMs });
 
   return { status: "OK", correct, alreadyAnswered: false, timeUp: false, score: player.score, ...reveal };
 }

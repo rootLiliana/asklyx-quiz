@@ -393,6 +393,13 @@ export default function Podium() {
           </section>
         )}
 
+        {/* Jugadores (no la host, que abre el podio con ?code=): ver su % del quiz. */}
+        {!isDemo && finale && !searchParams.get("code") && localStorage.getItem("studentToken") && (
+          <a href="/mis-resultados" className="mt-10 rounded-xl bg-white/15 px-5 py-3 font-semibold hover:bg-white/25">
+            📊 Ver mis resultados
+          </a>
+        )}
+
         {isDemo && finale && (
           <button
             onClick={() => { setStep("calculating"); setReplayKey((current) => current + 1); }}

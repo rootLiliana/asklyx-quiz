@@ -823,6 +823,10 @@ export default function Join() {
               <button onClick={handleJoin} disabled={joining} className={primaryButtonClass}>
                 {joining ? "Entrando..." : "Entrar al juego"}
               </button>
+
+              <button onClick={() => navigate("/mis-resultados")} className={`${secondaryButtonClass} mt-3`}>
+                📊 Mis resultados
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

@@ -44,6 +44,10 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
   const [loading, setLoading] = useState(quizId !== null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  // Ya se jugó y tiene resultados: los cambios se guardan como un quiz nuevo
+  // (copia) para no alterar los resultados del original.
+  const [hasResults, setHasResults] = useState(false);
+  const [originalTitle, setOriginalTitle] = useState("");
 
   // Quien usa el editor le pone key={quizId}, así que esto solo corre al abrir.
   useEffect(() => {
@@ -56,6 +60,8 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
         const quiz: EditableQuiz = await response.json();
         if (cancelled) return;
         setTitle(quiz.title);
+        setOriginalTitle(quiz.title);
+        setHasResults(quiz.hasResults ?? false);
         setQuestions(quiz.questions);
         setQuizClassId(quiz.classId);
         setLoading(false);
@@ -97,19 +103,31 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
     updateQuestion(questionIndex, { options: question.options.filter((_, i) => i !== optionIndex), correctAnswer });
   };
 
+  const copyTitle = title.trim() === originalTitle.trim() ? `${originalTitle.trim()} (copia)` : title.trim();
+
   const save = async () => {
     const problem = validateQuiz(title, questions);
     if (problem) { setMessage(problem); return; }
 
+    const asCopy = Boolean(quizId) && hasResults;
     setSaving(true);
     setMessage("");
     try {
-      const response = await api(`/host/quizzes${quizId ? `/${quizId}` : ""}`, {
-        method: quizId ? "PUT" : "POST",
+      const response = await api(`/host/quizzes${quizId && !asCopy ? `/${quizId}` : ""}`, {
+        method: quizId && !asCopy ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ classId: quizClassId, title, questions }),
+        body: JSON.stringify({ classId: quizClassId, title: asCopy ? copyTitle : title, questions }),
       });
 
+      if (response.status === 409) {
+        const body = await response.json().catch(() => null);
+        if (body?.code === "QUIZ_HAS_RESULTS") {
+          // Alguien lo jugó mientras se editaba: pasar a "guardar como copia".
+          setHasResults(true);
+          setMessage("Este quiz acaba de quedar con resultados. Vuelve a guardar: se creará una copia.");
+          return;
+        }
+      }
       if (!response.ok) {
         setMessage("No pudimos guardar el quiz. Intenta nuevamente.");
         return;
@@ -117,7 +135,7 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
 
       const saved: EditableQuiz = await response.json();
       setQuestions(saved.questions);
-      setMessage("✓ Quiz guardado.");
+      setMessage(asCopy ? `✓ Se guardó como un quiz nuevo: «${saved.title}». El original y sus resultados no cambiaron.` : "✓ Quiz guardado.");
       onSaved(saved);
     } catch (error) {
       console.error("Error guardando quiz", error);
@@ -132,7 +150,7 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
 
     const response = await api(`/host/quizzes/${quizId}`, { method: "DELETE" });
     if (response.status === 409) {
-      setMessage("Este quiz ya se usó en una sesión, así que se conserva para no perder el historial de asistencia.");
+      setMessage("Este quiz ya se usó en una sesión, así que se conserva para no perder sus resultados ni la asistencia.");
       return;
     }
     if (!response.ok) {
@@ -148,6 +166,16 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
 
   return (
     <div>
+      {hasResults && (
+        <div className="mb-6 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-4 text-sm">
+          <p className="font-bold text-amber-200">📊 Este quiz ya se jugó y tiene resultados</p>
+          <p className="mt-1 text-slate-200">
+            Para no alterarlos, tus cambios se guardarán como un <strong>quiz nuevo</strong>
+            {" "}(«{copyTitle}»). El original se queda como está.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
         <div>
           <label className={labelClass}>Título del quiz</label>
@@ -227,14 +255,14 @@ export default function QuizEditor({ api, quizId, classId, classLabel, onSaved, 
           Agregar pregunta
         </button>
         <button onClick={save} disabled={saving} className="rounded-xl bg-green-600 hover:bg-green-500 px-4 py-3 font-bold disabled:opacity-50">
-          {saving ? "Guardando..." : quizId ? "Guardar cambios" : "Guardar quiz"}
+          {saving ? "Guardando..." : hasResults ? "Guardar como copia" : quizId ? "Guardar cambios" : "Guardar quiz"}
         </button>
         {onCancel && (
           <button onClick={onCancel} className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-3">
             Cancelar
           </button>
         )}
-        {quizId && onDeleted && (
+        {quizId && onDeleted && !hasResults && (
           <button onClick={remove} className="rounded-xl bg-red-600 hover:bg-red-500 px-4 py-3 ml-auto">
             Borrar quiz
           </button>

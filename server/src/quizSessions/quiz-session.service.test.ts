@@ -19,6 +19,16 @@ class FakeQuizSessionRepository implements QuizSessionRepository {
   async findByGameCode(gameCode: string): Promise<QuizSession | null> {
     return this.sessionsByGameCode.get(gameCode) ?? null;
   }
+
+  async markStarted(gameCode: string): Promise<void> {
+    const session = this.sessionsByGameCode.get(gameCode);
+    if (session?.status === "WAITING") session.status = "IN_PROGRESS";
+  }
+
+  async markFinished(gameCode: string): Promise<void> {
+    const session = this.sessionsByGameCode.get(gameCode);
+    if (session) session.status = "FINISHED";
+  }
 }
 
 test("creates a PRACTICE session with the Game Manager code", async () => {
@@ -42,7 +52,7 @@ test("rejects unsupported session modes", () => {
   const service = new QuizSessionService(new FakeQuizSessionRepository());
 
   assert.throws(
-    () => service.create({ quizId: "10", hostId: "20", classId: "3", groupId: null, gameCode: "ANA-4821", mode: "LIVE" as "PRACTICE" }),
+    () => service.create({ quizId: "10", hostId: "20", classId: "3", groupId: null, gameCode: "ANA-4821", mode: "OFFICIAL" as "PRACTICE" }),
     QuizSessionInputError,
   );
 });
@@ -71,4 +81,15 @@ test("rejects a session without a valid classId", () => {
     () => service.create({ quizId: "10", hostId: "20", classId: "", groupId: null, gameCode: "ANA-4821", mode: "PRACTICE" }),
     QuizSessionInputError,
   );
+});
+
+test("a live session goes WAITING -> IN_PROGRESS -> FINISHED", async () => {
+  const service = new QuizSessionService(new FakeQuizSessionRepository());
+  await service.create({ quizId: "10", hostId: "20", classId: "3", groupId: null, gameCode: "ANA-4821", mode: "LIVE" });
+
+  await service.markStarted("ANA-4821");
+  assert.equal((await service.findByGameCode("ANA-4821"))?.status, "IN_PROGRESS");
+
+  await service.markFinished("ANA-4821");
+  assert.equal((await service.findByGameCode("ANA-4821"))?.status, "FINISHED");
 });

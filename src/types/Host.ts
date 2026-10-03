@@ -34,6 +34,8 @@ export interface SavedQuizSummary {
   groupId: string;
   groupName: string | null;
   questionCount: number;
+  // Ya se jugó y tiene resultados: se edita guardando una copia.
+  hasResults: boolean;
 }
 
 // GET/POST/PUT /host/quizzes/:id
@@ -42,6 +44,8 @@ export interface EditableQuiz {
   classId: string;
   title: string;
   questions: Question[];
+  // Solo viene al abrir un quiz (GET /host/quizzes/:id).
+  hasResults?: boolean;
 }
 
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "JUSTIFIED";

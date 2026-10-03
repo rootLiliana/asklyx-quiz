@@ -7,6 +7,7 @@ import Quiz from "./pages/Quiz";
 import IceBreaker from "./pages/IceBreaker";
 import  Podium  from "./pages/Podium";
 import ResetPassword from "./pages/ResetPassword";
+import MyResults from "./pages/MyResults";
 
 function App() {
   return (
@@ -25,6 +26,8 @@ function App() {
         <Route path="/podium" element={<Podium />} />
 
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        <Route path="/mis-resultados" element={<MyResults />} />
       </Routes>
     </BrowserRouter>
   );

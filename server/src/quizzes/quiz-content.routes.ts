@@ -5,6 +5,7 @@ import { QuizContentConflictError, QuizContentInUseError } from "./quiz-content.
 import {
   QuizContentClassNotFoundError,
   QuizContentInputError,
+  QuizContentHasResultsError,
   QuizContentNotFoundError,
   type QuizContentService,
 } from "./quiz-content.service.js";
@@ -43,7 +44,7 @@ export function createHostQuizRouter(
         res.status(404).json({ message: "Quiz not found" });
         return;
       }
-      res.json(toEditableQuiz(quiz));
+      res.json({ ...toEditableQuiz(quiz), hasResults: await quizContentService.hasResults(quiz.id) });
     } catch (error: unknown) {
       handleError(error, res, next);
     }
@@ -133,6 +134,10 @@ function handleError(error: unknown, res: Response, next: NextFunction): void {
   }
   if (error instanceof QuizContentNotFoundError || error instanceof QuizContentClassNotFoundError) {
     res.status(404).json({ message: error.message });
+    return;
+  }
+  if (error instanceof QuizContentHasResultsError) {
+    res.status(409).json({ code: "QUIZ_HAS_RESULTS", message: error.message });
     return;
   }
   if (error instanceof QuizContentConflictError || error instanceof QuizContentInUseError) {

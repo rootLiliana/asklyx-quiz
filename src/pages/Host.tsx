@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { API } from "../config/api";
 import AttendancePanel from "../components/host/AttendancePanel";
 import ClassesPanel from "../components/host/ClassesPanel";
+import ResultsPanel from "../components/host/ResultsPanel";
 import LiveGame from "../components/host/LiveGame";
 import QuizLibrary from "../components/host/QuizLibrary";
 import SessionWizard, { type SessionInfo } from "../components/host/SessionWizard";
@@ -11,13 +12,14 @@ import type { HostFetch } from "../types/Host";
 import type { LoginResponse, PublicUser } from "../types/User";
 import { changePassword, PASSWORD_HINT } from "../lib/changePassword";
 
-type Tab = "session" | "classes" | "quizzes" | "attendance" | "users";
+type Tab = "session" | "classes" | "quizzes" | "attendance" | "results" | "users";
 
 const TAB_LABEL: Record<Tab, string> = {
   session: "🎮 Sesión",
   classes: "📅 Clases",
   quizzes: "📚 Quizzes",
   attendance: "✅ Asistencia",
+  results: "📊 Resultados",
   users: "👥 Usuarias",
 };
 
@@ -234,7 +236,7 @@ export default function Host() {
   }
 
   const isAdmin = hostUser.role === "ADMIN";
-  const tabs: Tab[] = ["session", "classes", "quizzes", "attendance", "users"];
+  const tabs: Tab[] = ["session", "classes", "quizzes", "attendance", "results", "users"];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white p-4 md:p-8">
@@ -284,6 +286,7 @@ export default function Host() {
         {tab === "classes" && <ClassesPanel api={api} onChanged={() => setClassesVersion((current) => current + 1)} />}
         {tab === "quizzes" && <QuizLibrary api={api} />}
         {tab === "attendance" && <AttendancePanel api={api} canEdit={isAdmin} />}
+        {tab === "results" && <ResultsPanel api={api} />}
         {tab === "users" && <UsersPanel api={api} canEdit={isAdmin} />}
       </div>
     </div>

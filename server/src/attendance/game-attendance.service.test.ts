@@ -75,6 +75,7 @@ class FakeQuizContentRepository implements QuizContentRepository {
   async findAll(): Promise<QuizSummary[]> { return []; }
   async update(): Promise<QuizContent | null> { throw new Error("not used in these tests"); }
   async delete(): Promise<boolean> { throw new Error("not used in these tests"); }
+  async hasResults(): Promise<boolean> { return false; }
 }
 
 class FakeQuizSessionRepository implements QuizSessionRepository {
@@ -88,7 +89,7 @@ class FakeQuizSessionRepository implements QuizSessionRepository {
       classId: classItem?.id ?? null,
       groupId: classItem?.groupId ?? null,
       gameCode,
-      mode: "PRACTICE",
+      mode: "LIVE",
       status: "WAITING",
     });
   }
@@ -102,6 +103,9 @@ class FakeQuizSessionRepository implements QuizSessionRepository {
   async findByGameCode(gameCode: string): Promise<QuizSession | null> {
     return this.sessionsByGameCode.get(gameCode) ?? null;
   }
+
+  async markStarted(): Promise<void> {}
+  async markFinished(): Promise<void> {}
 }
 
 class FakeUserRepository implements UserRepository {
