@@ -161,7 +161,7 @@ export default function MyGroup() {
                     ) : null}
                   </div>
 
-                  {classItem.materials.length > 0 || practice.some((item) => item.classId === classItem.id) ? (
+                  {classItem.materials.length > 0 || practice.some((item) => item.lessonId === classItem.lessonId) ? (
                     <div className="mt-3 grid grid-cols-1 gap-2">
                       {classItem.materials.map((material) => (
                         <button
@@ -173,7 +173,7 @@ export default function MyGroup() {
                           <span className="font-semibold break-words">{material.title}</span>
                         </button>
                       ))}
-                      {practice.filter((item) => item.classId === classItem.id).map((item) => (
+                      {practice.filter((item) => item.lessonId === classItem.lessonId).map((item) => (
                         <button
                           key={`practice-${item.quizId}`}
                           onClick={() => navigate(`/practica/${item.quizId}`)}

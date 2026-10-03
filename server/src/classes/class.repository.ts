@@ -1,4 +1,5 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import type { PoolConnection } from "mysql2/promise";
 
 import { getDatabasePool } from "../db.js";
 import type { ClassFields, ClassItem } from "./class.types.js";
@@ -13,6 +14,7 @@ interface ClassRow extends RowDataPacket {
   start_time: string | null;
   end_time: string | null;
   status: string;
+  lesson_id: number | string | null;
 }
 
 export interface ClassRepository {
@@ -36,7 +38,7 @@ export interface ClassWriteRepository extends ClassRepository {
 export class ClassInUseError extends Error {}
 
 const SELECT_COLUMNS =
-  "id, module_id, group_id, name, description, class_date, start_time, end_time, status";
+  "id, module_id, group_id, name, description, class_date, start_time, end_time, status, lesson_id";
 
 function serializeNullableDate(value: Date | string | null): string | null {
   if (value === null) {
@@ -57,7 +59,24 @@ function toClassItem(row: ClassRow): ClassItem {
     startTime: row.start_time,
     endTime: row.end_time,
     status: row.status,
+    lessonId: row.lesson_id === null ? null : String(row.lesson_id),
   };
+}
+
+// La sesión de (módulo, nombre); la crea si no existe. Las clases de
+// distintos grupos con el mismo módulo y nombre comparten sesión.
+async function findOrCreateLesson(connection: PoolConnection, moduleId: string, name: string): Promise<string> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    "SELECT id FROM lessons WHERE module_id = ? AND name = ? LIMIT 1",
+    [moduleId, name],
+  );
+  if (rows[0]) return String(rows[0].id);
+
+  const [result] = await connection.execute<ResultSetHeader>(
+    "INSERT INTO lessons (module_id, name) VALUES (?, ?)",
+    [moduleId, name],
+  );
+  return String(result.insertId);
 }
 
 export class MysqlClassRepository implements ClassWriteRepository {
@@ -68,10 +87,11 @@ export class MysqlClassRepository implements ClassWriteRepository {
     try {
       await connection.beginTransaction();
       for (const fields of classes) {
+        const lessonId = await findOrCreateLesson(connection, fields.moduleId, fields.name);
         const [result] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO classes (module_id, group_id, name, description, class_date, start_time, end_time)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [fields.moduleId, fields.groupId, fields.name, fields.description, fields.classDate, fields.startTime, fields.endTime],
+          `INSERT INTO classes (module_id, group_id, name, description, class_date, start_time, end_time, lesson_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [fields.moduleId, fields.groupId, fields.name, fields.description, fields.classDate, fields.startTime, fields.endTime, lessonId],
         );
         ids.push(String(result.insertId));
       }
@@ -87,17 +107,57 @@ export class MysqlClassRepository implements ClassWriteRepository {
     return created.filter((classItem): classItem is ClassItem => classItem !== null);
   }
 
+  // Si cambian el módulo o el nombre, la clase pasa a la sesión de ese
+  // (módulo, nombre). Excepción: si era la única clase de su sesión y no
+  // existe otra con el nombre nuevo, se renombra la sesión misma, para que su
+  // material y su práctica la sigan acompañando.
   async update(id: string, fields: ClassFields): Promise<ClassItem | null> {
-    if (!(await this.findById(id))) {
+    const current = await this.findById(id);
+    if (!current) {
       return null;
     }
 
-    await getDatabasePool().execute<ResultSetHeader>(
-      `UPDATE classes
-       SET module_id = ?, group_id = ?, name = ?, description = ?, class_date = ?, start_time = ?, end_time = ?
-       WHERE id = ?`,
-      [fields.moduleId, fields.groupId, fields.name, fields.description, fields.classDate, fields.startTime, fields.endTime, id],
-    );
+    const connection = await getDatabasePool().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      let lessonId = current.lessonId ?? null;
+      const renamed = current.moduleId !== fields.moduleId || current.name !== fields.name;
+      if (renamed || !lessonId) {
+        const [targetRows] = await connection.execute<RowDataPacket[]>(
+          "SELECT id FROM lessons WHERE module_id = ? AND name = ? LIMIT 1",
+          [fields.moduleId, fields.name],
+        );
+        const [siblingRows] = lessonId
+          ? await connection.execute<RowDataPacket[]>("SELECT COUNT(*) AS total FROM classes WHERE lesson_id = ? AND id <> ?", [lessonId, id])
+          : [[{ total: 1 }] as RowDataPacket[]];
+        const isAlone = Number(siblingRows[0]?.total ?? 0) === 0;
+
+        if (targetRows[0]) {
+          lessonId = String(targetRows[0].id);
+        } else if (lessonId && isAlone) {
+          await connection.execute<ResultSetHeader>(
+            "UPDATE lessons SET module_id = ?, name = ? WHERE id = ?",
+            [fields.moduleId, fields.name, lessonId],
+          );
+        } else {
+          lessonId = await findOrCreateLesson(connection, fields.moduleId, fields.name);
+        }
+      }
+
+      await connection.execute<ResultSetHeader>(
+        `UPDATE classes
+         SET module_id = ?, group_id = ?, name = ?, description = ?, class_date = ?, start_time = ?, end_time = ?, lesson_id = ?
+         WHERE id = ?`,
+        [fields.moduleId, fields.groupId, fields.name, fields.description, fields.classDate, fields.startTime, fields.endTime, lessonId, id],
+      );
+      await connection.commit();
+    } catch (error: unknown) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
     return this.findById(id);
   }

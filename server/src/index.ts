@@ -113,8 +113,8 @@ const gameAttendanceService = new GameAttendanceService(
   playerIdentityService,
   attendanceService,
 );
-const materialService = new MaterialService(new MysqlMaterialRepository(), classRepository, groupRepository);
-const practiceService = new PracticeService(new MysqlPracticeRepository(), classRepository, groupRepository);
+const materialService = new MaterialService(new MysqlMaterialRepository(), classRepository);
+const practiceService = new PracticeService(new MysqlPracticeRepository(), classRepository);
 const quizResultService = new QuizResultService(
   new MysqlQuizResultRepository(),
   quizSessionService,

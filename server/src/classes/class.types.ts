@@ -8,6 +8,9 @@ export interface ClassItem {
   startTime: string | null;
   endTime: string | null;
   status: string;
+  // Sesión (tema) compartida con las clases de otros grupos: el material y la
+  // práctica son de la sesión.
+  lessonId?: string | null;
 }
 
 // Datos editables de una clase. Fechas "YYYY-MM-DD", horas "HH:MM:SS".

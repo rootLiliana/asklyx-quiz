@@ -3,26 +3,27 @@ import test from "node:test";
 
 import type { ClassRepository } from "../classes/class.repository.js";
 import type { ClassItem } from "../classes/class.types.js";
-import type { GroupRepository } from "../groups/group.repository.js";
 import type { MaterialRepository } from "./material.repository.js";
 import { MaterialClassNotFoundError, MaterialInputError, MaterialNotFoundError, MaterialService, validateMaterialInput } from "./material.service.js";
 import type { Material, MaterialFields } from "./material.types.js";
 
+// "Sesión 3" la tienen los dos grupos: misma sesión (lesson "L3").
 const classCdd1: ClassItem = {
   id: "1", moduleId: "1", groupId: "10", name: "Sesión 3", description: null,
-  classDate: "2026-10-05", startTime: null, endTime: null, status: "SCHEDULED",
+  classDate: "2026-10-05", startTime: null, endTime: null, status: "SCHEDULED", lessonId: "L3",
 };
+const classCdd2: ClassItem = { ...classCdd1, id: "2", groupId: "11", classDate: "2026-10-06" };
 const NOW = new Date("2026-10-03T12:00:00Z");
 
 class FakeMaterials implements MaterialRepository {
   items = new Map<string, Material>();
   private nextId = 1;
 
-  async findByClass(classId: string) { return [...this.items.values()].filter((item) => item.classId === classId); }
+  async findByLesson(lessonId: string) { return [...this.items.values()].filter((item) => item.lessonId === lessonId); }
   async findById(id: string) { return this.items.get(id) ?? null; }
-  async create(classId: string, fields: MaterialFields, createdBy: string) {
+  async create(lessonId: string, fields: MaterialFields, createdBy: string) {
     const material: Material = {
-      id: String(this.nextId++), classId, title: fields.title, blocks: fields.blocks, sortOrder: this.nextId,
+      id: String(this.nextId++), lessonId, title: fields.title, blocks: fields.blocks, sortOrder: this.nextId,
       publishedAt: fields.publishedAt?.toISOString() ?? null, createdBy, updatedAt: null,
     };
     this.items.set(material.id, material);
@@ -37,15 +38,15 @@ class FakeMaterials implements MaterialRepository {
   }
   async delete(id: string) { return this.items.delete(id); }
   async findForStudent() { return []; }
+  // ana (25) está en CDD1 y bere (28) en CDD2: ambas tienen la sesión L3. luis (26), ninguna.
+  async isLessonVisibleTo(lessonId: string, userId: string) { return lessonId === "L3" && ["25", "28"].includes(userId); }
 }
 
-const classes = { findById: async (id: string) => (id === classCdd1.id ? classCdd1 : null) } as unknown as ClassRepository;
-// ana (25) está en el grupo 10; luis (26) en otro grupo.
-const groups = { hasMember: async (groupId: string, userId: string) => groupId === "10" && userId === "25" } as unknown as GroupRepository;
+const classes = { findById: async (id: string) => [classCdd1, classCdd2].find((item) => item.id === id) ?? null } as unknown as ClassRepository;
 
 function build() {
   const repository = new FakeMaterials();
-  return { repository, service: new MaterialService(repository, classes, groups, () => NOW) };
+  return { repository, service: new MaterialService(repository, classes, () => NOW) };
 }
 
 const validInput = (publishedAt: string | null) => ({
@@ -85,7 +86,7 @@ test("an unknown code language falls back to python", () => {
 test("hosts create materials only for existing classes", async () => {
   const { service } = build();
   const created = await service.create(classCdd1.id, validInput(null), "1");
-  assert.equal(created.classId, classCdd1.id);
+  assert.equal(created.lessonId, "L3");
   await assert.rejects(service.create("999", validInput(null), "1"), MaterialClassNotFoundError);
 });
 
@@ -108,4 +109,14 @@ test("update and delete report a material that does not exist", async () => {
   await assert.rejects(service.update("999", validInput(null)), MaterialNotFoundError);
   await assert.rejects(service.delete("999"), MaterialNotFoundError);
   await assert.rejects(service.delete("abc"), MaterialInputError);
+});
+
+test("material is per session: created from one group's class, both groups' classes list it and both groups' students open it", async () => {
+  const { service } = build();
+  const material = await service.create(classCdd1.id, validInput("2026-10-02T12:00:00Z"), "1");
+
+  assert.deepEqual((await service.listForClass(classCdd2.id)).map((item) => item.id), [material.id]);
+  assert.equal((await service.getForStudent(material.id, "25")).id, material.id);
+  assert.equal((await service.getForStudent(material.id, "28")).id, material.id);
+  await assert.rejects(service.getForStudent(material.id, "26"), MaterialNotFoundError);
 });

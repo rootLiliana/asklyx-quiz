@@ -8,7 +8,7 @@ export type MaterialBlock =
 
 export interface Material {
   id: string;
-  classId: string;
+  lessonId: string;
   title: string;
   blocks: MaterialBlock[];
   sortOrder: number;
@@ -19,6 +19,7 @@ export interface Material {
 
 export interface StudentClassMaterials {
   id: string;
+  lessonId: string | null;
   name: string;
   classDate: string | null;
   startTime: string | null;

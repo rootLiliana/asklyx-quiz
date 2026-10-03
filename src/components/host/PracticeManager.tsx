@@ -602,7 +602,7 @@ export default function PracticeManager({ api, classId, onViewChange }: {
 
       {error && <p className="text-red-300 mb-3">{error}</p>}
       {!quizzes && !error && <p className="text-slate-400">Cargando...</p>}
-      {quizzes?.length === 0 && <p className="text-slate-400 text-center py-6">Esta clase todavía no tiene quizzes de práctica.</p>}
+      {quizzes?.length === 0 && <p className="text-slate-400 text-center py-6">Esta sesión todavía no tiene quizzes de práctica.</p>}
 
       <div className="grid grid-cols-1 gap-2">
         {quizzes?.map((quiz) => (

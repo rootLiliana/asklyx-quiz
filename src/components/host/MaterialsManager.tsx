@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { formatClassDate } from "../../lib/classDates";
 import { fieldClass, labelClass, panelClass } from "../../lib/hostStyles";
 import type { ClassSummary, HostFetch } from "../../types/Host";
 import type { CodeLanguage, Material, MaterialBlock } from "../../types/Material";
@@ -226,10 +225,11 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
 }
 
 // Material de una clase: lista + editor.
-export default function MaterialsManager({ api, classItem, groupName, onBack }: {
+export default function MaterialsManager({ api, classItem, sharedWith, onBack }: {
   api: HostFetch;
   classItem: ClassSummary;
-  groupName: string;
+  // Grupos (y fechas) que tienen esta sesión, p. ej. "CDD1 (lun 5 oct) y CDD2 (mar 6 oct)".
+  sharedWith: string;
   onBack: () => void;
 }) {
   const [materials, setMaterials] = useState<Material[] | null>(null);
@@ -250,7 +250,7 @@ export default function MaterialsManager({ api, classItem, groupName, onBack }: 
       })
       .catch((err: unknown) => {
         console.error("Error cargando material", err);
-        if (!cancelled) setError("No pudimos cargar el material de esta clase.");
+        if (!cancelled) setError("No pudimos cargar el material de esta sesión.");
       });
 
     return () => { cancelled = true; };
@@ -284,8 +284,9 @@ export default function MaterialsManager({ api, classItem, groupName, onBack }: 
       <button onClick={onBack} className="text-slate-400 hover:text-white text-sm mb-4">← Volver a clases</button>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
         <div className="min-w-0">
-          <h2 className="text-2xl font-bold">📚 Material de la clase</h2>
-          <p className="text-sm text-slate-400 break-words">{formatClassDate(classItem.classDate)} · {groupName} — {classItem.name}</p>
+          <h2 className="text-2xl font-bold">📚 Material de la sesión</h2>
+          <p className="text-sm text-slate-400 break-words">{classItem.name}</p>
+          <p className="text-xs text-slate-500 break-words">Lo ven: {sharedWith}</p>
         </div>
         <button onClick={() => setEditing("new")} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-4 py-3 font-bold">+ Nuevo material</button>
       </div>
@@ -293,7 +294,7 @@ export default function MaterialsManager({ api, classItem, groupName, onBack }: 
       {error && <p className="text-red-300 mb-3">{error}</p>}
       {!materials && !error && <p className="text-slate-400">Cargando...</p>}
       {materials?.length === 0 && (
-        <p className="text-slate-400 text-center py-8">Esta clase todavía no tiene material. Agrega una lectura, código o enlaces para que los alumnos se preparen.</p>
+        <p className="text-slate-400 text-center py-8">Esta sesión todavía no tiene material. Agrega una lectura, código o enlaces para que los alumnos se preparen.</p>
       )}
 
       <div className="grid grid-cols-1 gap-2">

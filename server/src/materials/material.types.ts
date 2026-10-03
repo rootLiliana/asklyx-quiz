@@ -9,9 +9,10 @@ export type MaterialBlock =
   | { type: "code"; language: CodeLanguage; code: string }
   | { type: "link"; url: string; label: string };
 
+// El material es de la sesión (lesson): lo ven todos los grupos que la tienen.
 export interface Material {
   id: string;
-  classId: string;
+  lessonId: string;
   title: string;
   blocks: MaterialBlock[];
   sortOrder: number;
@@ -30,6 +31,7 @@ export interface MaterialFields {
 // Vista de la alumna: sus clases y el material ya publicado de cada una.
 export interface StudentClassMaterials {
   id: string;
+  lessonId: string | null;
   name: string;
   classDate: string | null;
   startTime: string | null;

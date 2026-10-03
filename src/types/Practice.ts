@@ -57,7 +57,9 @@ export interface PublicPracticeQuiz {
 
 export interface StudentPracticeSummary {
   quizId: string;
-  classId: string;
+  lessonId: string;
+  // Nombre de la sesión (p. ej. "Sesión 3 - Agrupamientos").
+  lessonName: string;
   title: string;
   questionCount: number;
   attempts: number;
