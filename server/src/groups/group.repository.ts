@@ -1,7 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { getDatabasePool } from "../db.js";
-import type { CreateGroupInput, Group, GroupStudent } from "./group.types.js";
+import type { CreateGroupInput, Group, GroupMembership, GroupStudent } from "./group.types.js";
 
 interface GroupRow extends RowDataPacket {
   id: number | string;
@@ -25,6 +25,9 @@ export interface GroupRepository {
   hasMember(groupId: string, userId: string): Promise<boolean>;
   addMember(groupId: string, userId: string): Promise<void>;
   removeMember(groupId: string, userId: string): Promise<boolean>;
+  findAllMemberships(): Promise<GroupMembership[]>;
+  // Deja a la persona solo en `groupId` (o en ninguno si es null).
+  setOnlyGroup(userId: string, groupId: string | null): Promise<void>;
 }
 
 export class GroupConflictError extends Error {}
@@ -133,6 +136,34 @@ export class MysqlGroupRepository implements GroupRepository {
       }
 
       throw error;
+    }
+  }
+
+  async findAllMemberships(): Promise<GroupMembership[]> {
+    const [rows] = await getDatabasePool().execute<RowDataPacket[]>(
+      "SELECT user_id, group_id FROM group_members ORDER BY user_id ASC, group_id ASC",
+    );
+    return rows.map((row) => ({ userId: String(row.user_id), groupId: String(row.group_id) }));
+  }
+
+  async setOnlyGroup(userId: string, groupId: string | null): Promise<void> {
+    const connection = await getDatabasePool().getConnection();
+
+    try {
+      await connection.beginTransaction();
+      await connection.execute<ResultSetHeader>("DELETE FROM group_members WHERE user_id = ?", [userId]);
+      if (groupId) {
+        await connection.execute<ResultSetHeader>(
+          "INSERT INTO group_members (group_id, user_id) VALUES (?, ?)",
+          [groupId, userId],
+        );
+      }
+      await connection.commit();
+    } catch (error: unknown) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
   }
 

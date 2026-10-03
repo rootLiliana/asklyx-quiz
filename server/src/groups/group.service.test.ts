@@ -14,7 +14,7 @@ import {
   GroupUserNotFoundError,
   GroupUserNotStudentError,
 } from "./group.service.js";
-import type { CreateGroupInput, Group, GroupStudent } from "./group.types.js";
+import type { CreateGroupInput, Group, GroupStudent, GroupMembership } from "./group.types.js";
 import { CDD1_GROUP_NAME, CDD2_GROUP_NAME } from "./group-schedule.js";
 
 const existingGroup: Group = {
@@ -65,6 +65,8 @@ const GROUPS_BY_NAME = new Map<string, Group>([
 ]);
 
 class FakeGroupRepository implements GroupRepository {
+  async findAllMemberships(): Promise<GroupMembership[]> { return []; }
+  setOnlyGroup: GroupRepository["setOnlyGroup"] = async () => {};
   members = new Set<string>();
   createdInput: CreateGroupInput | undefined;
   addMemberShouldConflict = false;
@@ -215,4 +217,29 @@ test("assignTodayGroupToStudent reports a controlled outcome when no group is sc
   const service = new GroupService(new FakeGroupRepository(), new FakeUserRepository());
 
   await assert.rejects(service.assignTodayGroupToStudent(studentUser.id, FRIDAY), GroupNoScheduledGroupTodayError);
+});
+
+test("setStudentGroup leaves the student only in the chosen group, or in none with null", async () => {
+  const groups = new FakeGroupRepository();
+  const calls: Array<[string, string | null]> = [];
+  groups.setOnlyGroup = async (userId: string, groupId: string | null) => { calls.push([userId, groupId]); };
+  const service = new GroupService(groups, new FakeUserRepository());
+
+  await service.setStudentGroup(studentUser.id, secondGroup.id);
+  await service.setStudentGroup(studentUser.id, null);
+
+  assert.deepEqual(calls, [[studentUser.id, secondGroup.id], [studentUser.id, null]]);
+});
+
+test("setStudentGroup rejects unknown groups/users, non-students and invalid ids", async () => {
+  const service = new GroupService(new FakeGroupRepository(), new FakeUserRepository());
+
+  await assert.rejects(service.setStudentGroup(studentUser.id, "999"), GroupNotFoundError);
+  await assert.rejects(service.setStudentGroup("999", existingGroup.id), GroupUserNotFoundError);
+  await assert.rejects(service.setStudentGroup(studentUser.id, "abc"), GroupInputError);
+
+  const hostRepository = new FakeUserRepository();
+  hostRepository.findById = async (id) => (id === "30" ? { ...studentUser, id: "30", role: "HOST" } : null);
+  const serviceWithHost = new GroupService(new FakeGroupRepository(), hostRepository);
+  await assert.rejects(serviceWithHost.setStudentGroup("30", existingGroup.id), GroupUserNotStudentError);
 });

@@ -4,6 +4,7 @@ import { formatClassDate, nextDateOnWeekdays, todayIsoDay, toIsoDay } from "../.
 import { fieldClass, labelClass, panelClass } from "../../lib/hostStyles";
 import { getWeekdaysForGroup } from "../../lib/studentGroup";
 import type { ClassSummary, GroupSummary, HostFetch, ModuleSummary } from "../../types/Host";
+import MaterialsManager from "./MaterialsManager";
 
 // "18:00:00" -> "18:00" (lo que usa <input type="time">)
 function toTimeInput(value: string | null): string {
@@ -267,6 +268,8 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
   const [filterGroupId, setFilterGroupId] = useState("");
   const [showPast, setShowPast] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Clase cuyo material se está administrando.
+  const [materialsFor, setMaterialsFor] = useState<ClassSummary | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -294,7 +297,7 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
   };
 
   const remove = async (classItem: ClassSummary) => {
-    if (!window.confirm(`¿Borrar la clase "${classItem.name}" del ${formatClassDate(classItem.classDate)}?`)) return;
+    if (!window.confirm(`¿Borrar la clase "${classItem.name}" del ${formatClassDate(classItem.classDate)}? También se borrará su material.`)) return;
 
     const response = await api(`/classes/${classItem.id}`, { method: "DELETE" });
     if (response.status === 409) {
@@ -322,6 +325,17 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
       const order = (toIsoDay(a.classDate) ?? "").localeCompare(toIsoDay(b.classDate) ?? "");
       return showPast ? -order : order;
     });
+
+  if (materialsFor) {
+    return (
+      <MaterialsManager
+        api={api}
+        classItem={materialsFor}
+        groupName={groupName(materialsFor.groupId)}
+        onBack={() => setMaterialsFor(null)}
+      />
+    );
+  }
 
   if (catalog.loading || modules === null) {
     return <section className={panelClass}><p className="text-slate-400">Cargando...</p></section>;
@@ -401,6 +415,9 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
                     <td className="py-3 pr-4 text-slate-300">{moduleName(classItem.moduleId)}</td>
                     <td className="py-3 pr-4 text-slate-300 whitespace-nowrap">{formatTimeRange(classItem)}</td>
                     <td className="py-3 text-right whitespace-nowrap">
+                      <button onClick={() => setMaterialsFor(classItem)} className="rounded-lg bg-fuchsia-600/80 hover:bg-fuchsia-500 px-3 py-1 mr-2">
+                        📚 Material
+                      </button>
                       <button onClick={() => { setMessage(""); setEditingId(classItem.id); }} className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1 mr-2">
                         Editar
                       </button>

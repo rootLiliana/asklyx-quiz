@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fieldClass, panelClass } from "../../lib/hostStyles";
-import type { HostFetch } from "../../types/Host";
+import { API } from "../../config/api";
+import type { GroupSummary, HostFetch } from "../../types/Host";
 import type { PublicUser, UserRole } from "../../types/User";
 
 const ROLE_LABEL: Record<UserRole, string> = { STUDENT: "Alumno", HOST: "Host", ADMIN: "Admin" };
@@ -21,6 +22,34 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
   const [savingUserId, setSavingUserId] = useState("");
   const [resetResult, setResetResult] = useState<{ user: PublicUser; temporaryPassword: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [groups, setGroups] = useState<GroupSummary[]>([]);
+  // userId -> ids de sus grupos (normalmente uno).
+  const [groupsByUser, setGroupsByUser] = useState<Record<string, string[]>>({});
+  // "" = todos, "none" = alumnos sin grupo, o un id de grupo.
+  const [groupFilter, setGroupFilter] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([fetch(`${API}/groups`), api("/groups/members")])
+      .then(async ([groupsResponse, membersResponse]) => {
+        if (!groupsResponse.ok || !membersResponse.ok) throw new Error("groups request failed");
+        const groupList: GroupSummary[] = await groupsResponse.json();
+        const memberships: { userId: string; groupId: string }[] = await membersResponse.json();
+        if (cancelled) return;
+        setGroups(groupList);
+        setGroupsByUser(memberships.reduce<Record<string, string[]>>((map, { userId, groupId }) => {
+          (map[userId] ??= []).push(groupId);
+          return map;
+        }, {}));
+      })
+      .catch((err: unknown) => {
+        console.error("Error cargando grupos", err);
+        if (!cancelled) setError("No pudimos cargar los grupos.");
+      });
+
+    return () => { cancelled = true; };
+  }, [api]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,12 +131,40 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
     }
   };
 
+  // Solo admin: deja al alumno en ese grupo (o sin grupo con "").
+  const setStudentGroup = async (user: PublicUser, groupId: string) => {
+    setSavingUserId(user.id);
+    setError("");
+    try {
+      const response = await api(`/groups/members/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: groupId || null }),
+      });
+      if (!response.ok) {
+        setError("No pudimos cambiar el grupo.");
+        return;
+      }
+      setGroupsByUser((current) => ({ ...current, [user.id]: groupId ? [groupId] : [] }));
+    } finally {
+      setSavingUserId("");
+    }
+  };
+
+  const groupName = (id: string) => groups.find((group) => group.id === id)?.name ?? `Grupo ${id}`;
+  const studentsWithoutGroup = users.filter((user) => user.role === "STUDENT" && !(groupsByUser[user.id]?.length)).length;
+
   const normalizedSearch = search.trim().toLowerCase();
   const visibleUsers = users
     .filter((user) =>
       !normalizedSearch ||
       [user.name, user.lastNamePaternal, user.nickname, user.email].some((value) => (value ?? "").toLowerCase().includes(normalizedSearch)),
     )
+    .filter((user) => {
+      if (!groupFilter) return true;
+      const userGroups = groupsByUser[user.id] ?? [];
+      return groupFilter === "none" ? user.role === "STUDENT" && userGroups.length === 0 : userGroups.includes(groupFilter);
+    })
     // Admin y hosts primero.
     .sort((a, b) => Number(a.role === "STUDENT") - Number(b.role === "STUDENT"));
 
@@ -122,7 +179,16 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
               : "Puedes restablecer contraseñas de alumnos. Dar o quitar acceso de Host es solo de la administradora."}
           </p>
         </div>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, nickname o correo..." className={`${fieldClass} md:max-w-sm`} />
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, nickname o correo..." className={fieldClass} />
+          <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className={fieldClass}>
+            <option value="" className="text-black">Todos los grupos</option>
+            <option value="none" className="text-black">⚠️ Alumnos sin grupo ({studentsWithoutGroup})</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && <p className="text-red-300 mb-3">{error}</p>}
@@ -150,6 +216,7 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
           <thead className="text-left text-slate-400">
             <tr>
               <th className="py-2 pr-4">Nombre</th>
+              <th className="py-2 pr-4">Grupo</th>
               <th className="py-2 pr-4">Nickname</th>
               <th className="py-2 pr-4">Correo</th>
               <th className="py-2 pr-4">Rol</th>
@@ -160,6 +227,32 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
             {visibleUsers.map((user) => (
               <tr key={user.id} className="border-t border-white/10">
                 <td className="py-3 pr-4">{[user.name, user.lastNamePaternal, user.lastNameMaternal].filter(Boolean).join(" ")}</td>
+                <td className="py-3 pr-4 whitespace-nowrap">
+                  {user.role !== "STUDENT" ? (
+                    <span className="text-slate-500">—</span>
+                  ) : canEdit ? (
+                    <select
+                      value={groupsByUser[user.id]?.[0] ?? ""}
+                      disabled={savingUserId === user.id}
+                      onChange={(e) => void setStudentGroup(user, e.target.value)}
+                      className={`rounded-lg border p-2 text-white ${groupsByUser[user.id]?.length ? "border-white/20 bg-white/10" : "border-amber-400/60 bg-amber-500/10"}`}
+                    >
+                      <option value="" className="text-black">Sin grupo</option>
+                      {groups.map((group) => (
+                        <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+                      ))}
+                    </select>
+                  ) : groupsByUser[user.id]?.length ? (
+                    <span className="text-slate-300">{groupsByUser[user.id]!.map(groupName).join(", ")}</span>
+                  ) : (
+                    <span className="text-amber-300">Sin grupo</span>
+                  )}
+                  {canEdit && (groupsByUser[user.id]?.length ?? 0) > 1 && (
+                    <span className="ml-2 text-xs text-amber-300" title={groupsByUser[user.id]!.map(groupName).join(", ")}>
+                      +{groupsByUser[user.id]!.length - 1}
+                    </span>
+                  )}
+                </td>
                 <td className="py-3 pr-4 text-slate-300">{user.nickname ?? "—"}</td>
                 <td className="py-3 pr-4 text-slate-400">{user.email ?? "—"}</td>
                 <td className="py-3 pr-4">

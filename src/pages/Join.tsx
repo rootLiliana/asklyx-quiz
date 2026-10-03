@@ -824,9 +824,14 @@ export default function Join() {
                 {joining ? "Entrando..." : "Entrar al juego"}
               </button>
 
-              <button onClick={() => navigate("/mis-resultados")} className={`${secondaryButtonClass} mt-3`}>
-                📊 Mis resultados
-              </button>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <button onClick={() => navigate("/mi-grupo")} className={secondaryButtonClass}>
+                  📚 Mi grupo
+                </button>
+                <button onClick={() => navigate("/mis-resultados")} className={secondaryButtonClass}>
+                  📊 Mis resultados
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

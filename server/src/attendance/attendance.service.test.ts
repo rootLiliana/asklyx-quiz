@@ -4,7 +4,7 @@ import test from "node:test";
 import type { ClassRepository } from "../classes/class.repository.js";
 import type { ClassItem } from "../classes/class.types.js";
 import type { GroupRepository } from "../groups/group.repository.js";
-import type { CreateGroupInput, Group, GroupStudent } from "../groups/group.types.js";
+import type { CreateGroupInput, Group, GroupStudent, GroupMembership } from "../groups/group.types.js";
 import type { UserRepository } from "../users/user.repository.js";
 import type { User, UserRole, UserWithPasswordHash } from "../users/user.types.js";
 import type { AttendanceRepository } from "./attendance.repository.js";
@@ -52,6 +52,8 @@ class FakeClassRepository implements ClassRepository {
 }
 
 class FakeGroupRepository implements GroupRepository {
+  async findAllMemberships(): Promise<GroupMembership[]> { return []; }
+  async setOnlyGroup(): Promise<void> {}
   async create(input: CreateGroupInput): Promise<Group> { return { id: "1", name: input.name, createdAt: "2026-01-01T00:00:00.000Z" }; }
   async findById(): Promise<Group | null> { return { id: "1", name: "Grupo 1", createdAt: "2026-01-01T00:00:00.000Z" }; }
   async findByName(): Promise<Group | null> { return null; }

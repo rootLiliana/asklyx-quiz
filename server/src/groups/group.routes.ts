@@ -45,6 +45,39 @@ export function createGroupRouter(
     }
   });
 
+  // Todas las membresías (para la columna Grupo de Usuarias). Va antes de
+  // "/:id" para que "members" no se tome como un id.
+  router.get("/members", requireHost, async (_req, res, next) => {
+    try {
+      res.json(await groupService.listMemberships());
+    } catch (error: unknown) {
+      next(error);
+    }
+  });
+
+  // Solo admin. Body: { groupId: "2" } o { groupId: null } para quitarla.
+  router.put("/members/:userId", requireAdmin, async (req, res, next) => {
+    try {
+      const body = asRecord(req.body);
+      await groupService.setStudentGroup(getPathParam(req, "userId"), body.groupId === undefined ? "" : body.groupId);
+      res.status(204).send();
+    } catch (error: unknown) {
+      if (error instanceof GroupInputError) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+      if (error instanceof GroupNotFoundError || error instanceof GroupUserNotFoundError) {
+        res.status(404).json({ message: error.message });
+        return;
+      }
+      if (error instanceof GroupUserNotStudentError) {
+        res.status(422).json({ message: error.message });
+        return;
+      }
+      next(error);
+    }
+  });
+
   router.get("/", async (_req, res, next) => {
     try {
       const groups = await groupService.listGroups();

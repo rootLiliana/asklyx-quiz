@@ -2,7 +2,7 @@ import type { UserRepository } from "../users/user.repository.js";
 import { getGroupNameForDate } from "./group-schedule.js";
 import type { GroupRepository } from "./group.repository.js";
 import { GroupConflictError, GroupMembershipConflictError } from "./group.repository.js";
-import type { CreateGroupInput, Group, GroupStudent } from "./group.types.js";
+import type { CreateGroupInput, Group, GroupMembership, GroupStudent } from "./group.types.js";
 
 export class GroupInputError extends Error {}
 export class GroupNotFoundError extends Error {}
@@ -132,6 +132,30 @@ export class GroupService {
     }
 
     return group;
+  }
+
+  listMemberships(): Promise<GroupMembership[]> {
+    return this.groups.findAllMemberships();
+  }
+
+  // La admin inscribe a una alumna en su grupo (o la deja sin grupo con
+  // null). Una alumna queda en un solo grupo: se quita de los demás.
+  async setStudentGroup(userId: string, groupId: unknown): Promise<void> {
+    const validUserId = validateId(userId, "userId");
+    const validGroupId = groupId === null ? null : validateId(typeof groupId === "string" ? groupId : String(groupId ?? ""), "groupId");
+
+    const user = await this.users.findById(validUserId);
+    if (!user) {
+      throw new GroupUserNotFoundError("User not found");
+    }
+    if (user.role !== "STUDENT") {
+      throw new GroupUserNotStudentError("Only STUDENT users can be assigned to a group");
+    }
+    if (validGroupId && !(await this.groups.findById(validGroupId))) {
+      throw new GroupNotFoundError("Group not found");
+    }
+
+    await this.groups.setOnlyGroup(validUserId, validGroupId);
   }
 
   async removeStudent(groupId: string, studentId: string): Promise<void> {
