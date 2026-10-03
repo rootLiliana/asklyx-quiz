@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { fieldClass, labelClass, panelClass } from "../../lib/hostStyles";
 import type { ClassSummary, HostFetch } from "../../types/Host";
-import type { CodeLanguage, Material, MaterialBlock } from "../../types/Material";
+import type { CodeLanguage, Material, MaterialBlock, MaterialViewReport } from "../../types/Material";
 import MaterialView from "../material/MaterialView";
 import { initialScheduledAt, publishModeOf, resolvePublishedAt, scheduleProblem, type PublishMode } from "../../lib/publishing";
 import PracticeManager from "./PracticeManager";
@@ -224,6 +224,45 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
   );
 }
 
+// Quién abrió un material (abrir ≠ leer), por grupo, con la lista de quienes
+// faltan para poder recordárselo.
+function MaterialViews({ materialId, report }: { materialId: string; report: MaterialViewReport }) {
+  const [open, setOpen] = useState(false);
+  const viewers = new Set(report.views.filter((view) => view.materialId === materialId).map((view) => view.studentId));
+  const opened = report.students.filter((student) => viewers.has(student.id)).length;
+  const groups = [...new Map(report.students.map((student) => [student.groupId, student.groupName])).entries()];
+  const fullName = (student: MaterialViewReport["students"][number]) =>
+    [student.name, student.lastNamePaternal].filter(Boolean).join(" ");
+
+  if (report.students.length === 0) return null;
+
+  return (
+    <div className="w-full">
+      <button onClick={() => setOpen((current) => !current)} className="text-xs text-slate-300 hover:text-white">
+        👀 {opened} de {report.students.length} lo abrieron {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <div className="mt-2 grid grid-cols-1 gap-2">
+          {groups.map(([groupId, groupName]) => {
+            const members = report.students.filter((student) => student.groupId === groupId);
+            const missing = members.filter((student) => !viewers.has(student.id));
+            return (
+              <div key={groupId} className="rounded-lg bg-black/20 p-2 text-xs">
+                <p className="font-semibold text-slate-200 break-words">
+                  {groupName} · {members.length - missing.length} de {members.length}
+                </p>
+                <p className="text-slate-400 break-words">
+                  {missing.length === 0 ? "Todas lo abrieron 🎉" : `Faltan: ${missing.map(fullName).join(", ")}`}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Material de una clase: lista + editor.
 export default function MaterialsManager({ api, classItem, sharedWith, onBack }: {
   api: HostFetch;
@@ -238,6 +277,8 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
   const [version, setVersion] = useState(0);
   // Editando o viendo resultados de una práctica: se oculta el material.
   const [practiceFocused, setPracticeFocused] = useState(false);
+  // Quién lo abrió; si falla, simplemente no se muestra.
+  const [viewReport, setViewReport] = useState<MaterialViewReport | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,6 +293,14 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
         console.error("Error cargando material", err);
         if (!cancelled) setError("No pudimos cargar el material de esta sesión.");
       });
+
+    api(`/classes/${classItem.id}/materials/views`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const data: MaterialViewReport = await response.json();
+        if (!cancelled) setViewReport(data);
+      })
+      .catch((err: unknown) => console.error("Error cargando quién abrió el material", err));
 
     return () => { cancelled = true; };
   }, [api, classItem.id, version]);
@@ -311,6 +360,7 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
               <button onClick={() => setEditing(material)} className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1">Editar</button>
               <button onClick={() => void remove(material)} className="rounded-lg bg-red-600/80 hover:bg-red-500 px-3 py-1">Borrar</button>
             </span>
+            {material.publishedAt && new Date(material.publishedAt) <= new Date() && viewReport && <MaterialViews materialId={material.id} report={viewReport} />}
           </div>
         ))}
       </div>

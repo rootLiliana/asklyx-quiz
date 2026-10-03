@@ -1,6 +1,6 @@
 import type { ClassRepository } from "../classes/class.repository.js";
 import type { MaterialRepository } from "./material.repository.js";
-import { CODE_LANGUAGES, type CodeLanguage, type Material, type MaterialBlock, type MaterialFields, type StudentClassMaterials } from "./material.types.js";
+import { CODE_LANGUAGES, type CodeLanguage, type Material, type MaterialBlock, type MaterialFields, type MaterialViewReport, type StudentClassMaterials } from "./material.types.js";
 
 export class MaterialInputError extends Error {}
 export class MaterialNotFoundError extends Error {}
@@ -111,6 +111,10 @@ export class MaterialService {
     return this.materials.create(await this.lessonOf(classId), fields, createdBy);
   }
 
+  async viewReport(classId: string): Promise<MaterialViewReport> {
+    return this.materials.viewReport(await this.lessonOf(classId));
+  }
+
   async update(id: string, input: unknown): Promise<Material> {
     const updated = await this.materials.update(validateId(id, "id"), validateMaterialInput(input));
     if (!updated) throw new MaterialNotFoundError("Material not found");
@@ -139,6 +143,13 @@ export class MaterialService {
     // revela que hay material escondido.
     if (!material || !isPublished || !isMember) {
       throw new MaterialNotFoundError("Material not found");
+    }
+
+    // Si no se puede anotar, igual se muestra el material.
+    try {
+      await this.materials.recordView(material.id, userId);
+    } catch (error: unknown) {
+      console.error("No se pudo anotar la apertura del material", error);
     }
     return material;
   }

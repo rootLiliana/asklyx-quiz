@@ -1,7 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { getDatabasePool } from "../db.js";
-import type { Material, MaterialBlock, MaterialFields, StudentClassMaterials } from "./material.types.js";
+import type { Material, MaterialBlock, MaterialFields, MaterialViewReport, StudentClassMaterials } from "./material.types.js";
 
 interface MaterialRow extends RowDataPacket {
   id: number | string;
@@ -41,6 +41,9 @@ export interface MaterialRepository {
   findForStudent(userId: string, now: Date): Promise<StudentClassMaterials[]>;
   // ¿La alumna está en algún grupo que tiene una clase de esa sesión?
   isLessonVisibleTo(lessonId: string, userId: string): Promise<boolean>;
+  // Anota que la alumna abrió el material (primera vez, última vez y cuántas).
+  recordView(materialId: string, studentId: string): Promise<void>;
+  viewReport(lessonId: string): Promise<MaterialViewReport>;
 }
 
 const COLUMNS = "id, lesson_id, title, blocks, sort_order, published_at, created_by, updated_at";
@@ -121,6 +124,55 @@ export class MysqlMaterialRepository implements MaterialRepository {
       [lessonId, userId],
     );
     return rows.length > 0;
+  }
+
+  async recordView(materialId: string, studentId: string): Promise<void> {
+    await getDatabasePool().execute<ResultSetHeader>(
+      `INSERT INTO material_views (material_id, student_id) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE last_viewed_at = CURRENT_TIMESTAMP, view_count = view_count + 1`,
+      [materialId, studentId],
+    );
+  }
+
+  async viewReport(lessonId: string): Promise<MaterialViewReport> {
+    const database = getDatabasePool();
+    const [[studentRows], [viewRows]] = await Promise.all([
+      database.execute<RowDataPacket[]>(
+        `SELECT DISTINCT u.id, u.name, u.last_name_paternal, u.nickname, g.id AS group_id, g.name AS group_name
+         FROM classes c
+         JOIN user_groups g ON g.id = c.group_id
+         JOIN group_members gm ON gm.group_id = c.group_id
+         JOIN users u ON u.id = gm.user_id
+         WHERE c.lesson_id = ? AND u.role = 'STUDENT'
+         ORDER BY g.name ASC, u.name ASC`,
+        [lessonId],
+      ),
+      database.execute<RowDataPacket[]>(
+        `SELECT v.material_id, v.student_id, v.first_viewed_at, v.last_viewed_at, v.view_count
+         FROM material_views v
+         JOIN class_materials m ON m.id = v.material_id
+         WHERE m.lesson_id = ?`,
+        [lessonId],
+      ),
+    ]);
+
+    return {
+      students: studentRows.map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+        lastNamePaternal: row.last_name_paternal === null ? null : String(row.last_name_paternal),
+        nickname: String(row.nickname),
+        groupId: String(row.group_id),
+        groupName: String(row.group_name),
+      })),
+      views: viewRows.map((row) => ({
+        materialId: String(row.material_id),
+        studentId: String(row.student_id),
+        firstViewedAt: toIso(row.first_viewed_at as Date | string | null),
+        lastViewedAt: toIso(row.last_viewed_at as Date | string | null),
+        viewCount: Number(row.view_count),
+      })),
+    };
   }
 
   async findForStudent(userId: string, now: Date): Promise<StudentClassMaterials[]> {

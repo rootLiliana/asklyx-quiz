@@ -40,6 +40,13 @@ class FakeMaterials implements MaterialRepository {
   async findForStudent() { return []; }
   // ana (25) está en CDD1 y bere (28) en CDD2: ambas tienen la sesión L3. luis (26), ninguna.
   async isLessonVisibleTo(lessonId: string, userId: string) { return lessonId === "L3" && ["25", "28"].includes(userId); }
+  views: { materialId: string; studentId: string }[] = [];
+  failViews = false;
+  async recordView(materialId: string, studentId: string) {
+    if (this.failViews) throw new Error("db caída");
+    this.views.push({ materialId, studentId });
+  }
+  async viewReport() { return { students: [], views: [] }; }
 }
 
 const classes = { findById: async (id: string) => [classCdd1, classCdd2].find((item) => item.id === id) ?? null } as unknown as ClassRepository;
@@ -119,4 +126,30 @@ test("material is per session: created from one group's class, both groups' clas
   assert.equal((await service.getForStudent(material.id, "25")).id, material.id);
   assert.equal((await service.getForStudent(material.id, "28")).id, material.id);
   await assert.rejects(service.getForStudent(material.id, "26"), MaterialNotFoundError);
+});
+
+test("opening a material records who opened it; refused openings record nothing", async () => {
+  const { service, repository } = build();
+  const draft = await service.create(classCdd1.id, validInput(null), "1");
+  const published = await service.create(classCdd1.id, validInput("2026-10-02T12:00:00Z"), "1");
+
+  await service.getForStudent(published.id, "25");
+  await service.getForStudent(published.id, "28");
+  await assert.rejects(service.getForStudent(draft.id, "25"), MaterialNotFoundError);
+  await assert.rejects(service.getForStudent(published.id, "26"), MaterialNotFoundError);
+
+  assert.deepEqual(repository.views, [{ materialId: published.id, studentId: "25" }, { materialId: published.id, studentId: "28" }]);
+});
+
+test("if recording the view fails, the student still gets the material", async () => {
+  const { service, repository } = build();
+  const published = await service.create(classCdd1.id, validInput("2026-10-02T12:00:00Z"), "1");
+  repository.failViews = true;
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    assert.equal((await service.getForStudent(published.id, "25")).id, published.id);
+  } finally {
+    console.error = originalError;
+  }
 });

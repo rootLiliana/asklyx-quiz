@@ -27,3 +27,9 @@ export interface StudentClassMaterials {
   groupName: string;
   materials: { id: string; title: string; publishedAt: string | null }[];
 }
+
+// GET /classes/:classId/materials/views — quién abrió el material de la sesión.
+export interface MaterialViewReport {
+  students: { id: string; name: string; lastNamePaternal: string | null; nickname: string; groupId: string; groupName: string }[];
+  views: { materialId: string; studentId: string; firstViewedAt: string | null; lastViewedAt: string | null; viewCount: number }[];
+}
