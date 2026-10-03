@@ -18,6 +18,7 @@ interface QuizRow extends RowDataPacket {
   description: string | null;
   time_limit_seconds: number | null;
   created_by: number | string;
+  kind: string;
 }
 
 interface QuizSummaryRow extends RowDataPacket {
@@ -30,6 +31,7 @@ interface QuizSummaryRow extends RowDataPacket {
   group_id: number | string;
   group_name: string | null;
   question_count: number | string;
+  has_results: number | string | boolean;
 }
 
 interface QuestionRow extends RowDataPacket {
@@ -52,6 +54,8 @@ export interface QuizContentRepository {
   create(content: CreateQuizContent): Promise<QuizContent>;
   findById(id: string): Promise<QuizContent | null>;
   findAll(classId?: string): Promise<QuizSummary[]>;
+  // ¿Alguna sesión de este quiz tiene resultados guardados (quiz_attempts)?
+  hasResults(id: string): Promise<boolean>;
   // Reemplaza datos y preguntas del quiz. null si el quiz no existe.
   update(id: string, content: CreateQuizContent): Promise<QuizContent | null>;
   // false si el quiz no existe.
@@ -66,7 +70,10 @@ export class QuizContentInUseError extends Error {}
 const SUMMARY_SELECT = `
   SELECT q.id, q.title, q.description, q.class_id,
          c.name AS class_name, c.class_date, c.group_id, g.name AS group_name,
-         (SELECT COUNT(*) FROM questions qu WHERE qu.quiz_id = q.id) AS question_count
+         (SELECT COUNT(*) FROM questions qu WHERE qu.quiz_id = q.id) AS question_count,
+         EXISTS (
+           SELECT 1 FROM quiz_sessions qs JOIN quiz_attempts a ON a.session_id = qs.id WHERE qs.quiz_id = q.id
+         ) AS has_results
   FROM quizzes q
   JOIN classes c ON c.id = q.class_id
   LEFT JOIN user_groups g ON g.id = c.group_id`;
@@ -168,14 +175,23 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
     }
   }
 
+  async hasResults(id: string): Promise<boolean> {
+    const [rows] = await getDatabasePool().execute<RowDataPacket[]>(
+      `SELECT 1 FROM quiz_sessions qs JOIN quiz_attempts a ON a.session_id = qs.id
+       WHERE qs.quiz_id = ? LIMIT 1`,
+      [id],
+    );
+    return rows.length > 0;
+  }
+
   async findAll(classId?: string): Promise<QuizSummary[]> {
     const [rows] = classId
       ? await getDatabasePool().execute<QuizSummaryRow[]>(
-          `${SUMMARY_SELECT} WHERE q.class_id = ? ORDER BY c.class_date DESC, q.id DESC`,
+          `${SUMMARY_SELECT} WHERE q.kind = 'LIVE' AND q.class_id = ? ORDER BY c.class_date DESC, q.id DESC`,
           [classId],
         )
       : await getDatabasePool().execute<QuizSummaryRow[]>(
-          `${SUMMARY_SELECT} ORDER BY c.class_date DESC, q.id DESC`,
+          `${SUMMARY_SELECT} WHERE q.kind = 'LIVE' ORDER BY c.class_date DESC, q.id DESC`,
         );
 
     return rows.map(toQuizSummary);
@@ -183,7 +199,7 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
 
   async findById(id: string): Promise<QuizContent | null> {
     const [quizRows] = await getDatabasePool().execute<QuizRow[]>(
-      "SELECT id, class_id, title, description, time_limit_seconds, created_by FROM quizzes WHERE id = ? LIMIT 1",
+      "SELECT id, class_id, title, description, time_limit_seconds, created_by, kind FROM quizzes WHERE id = ? LIMIT 1",
       [id],
     );
     const quizRow = quizRows[0];
@@ -206,6 +222,7 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
       description: quizRow.description,
       timeLimitSeconds: quizRow.time_limit_seconds,
       createdBy: String(quizRow.created_by),
+      kind: quizRow.kind === "PRACTICE" ? "PRACTICE" : "LIVE",
       questions: questions.map((question) => ({
         ...question,
         options: optionsByQuestion.get(question.id) ?? [],
@@ -289,6 +306,7 @@ function toQuizSummary(row: QuizSummaryRow): QuizSummary {
     groupId: String(row.group_id),
     groupName: row.group_name,
     questionCount: Number(row.question_count),
+    hasResults: Number(row.has_results) === 1 || row.has_results === true,
   };
 }
 

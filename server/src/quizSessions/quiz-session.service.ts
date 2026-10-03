@@ -17,10 +17,18 @@ export class QuizSessionService {
       throw new QuizSessionInputError("gameCode is required");
     }
     if (!QUIZ_SESSION_MODES.includes(input.mode as QuizSessionMode)) {
-      throw new QuizSessionInputError("mode must be OFFICIAL or PRACTICE");
+      throw new QuizSessionInputError("mode must be LIVE or PRACTICE");
     }
 
     return this.sessions.create(input);
+  }
+
+  markStarted(gameCode: string): Promise<void> {
+    return this.sessions.markStarted(gameCode.trim());
+  }
+
+  markFinished(gameCode: string): Promise<void> {
+    return this.sessions.markFinished(gameCode.trim());
   }
 
   findByGameCode(gameCode: string): Promise<QuizSession | null> {

@@ -42,6 +42,7 @@ function toGameManagerQuestion(question: StoredQuestion): Question {
     id: question.id,
     text: question.text,
     options: orderedOptions.map((option) => option.text),
+    optionIds: orderedOptions.map((option) => option.id),
     correctAnswer,
     explanation: question.explanation ?? "",
     answers: new Array(orderedOptions.length).fill(0),

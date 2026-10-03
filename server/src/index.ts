@@ -19,7 +19,10 @@ import { createGame,
   getIcebreaker, 
   submitIcebreakerAnswer, 
   closeIcebreaker,
-  getGameStats
+  getGameStats,
+  DEFAULT_QUESTION_SECONDS,
+  MIN_QUESTION_SECONDS,
+  MAX_QUESTION_SECONDS,
  } from "./gameManager.js";
 import { loadEnvFile } from "./env.js";
 import { checkDatabaseConnection } from "./db.js";
@@ -44,6 +47,15 @@ import { createAttendanceRouter } from "./attendance/attendance.routes.js";
 import { AttendanceService } from "./attendance/attendance.service.js";
 import { MysqlAttendanceRepository } from "./attendance/attendance.repository.js";
 import { GameAttendanceService } from "./attendance/game-attendance.service.js";
+import { MysqlQuizResultRepository } from "./results/quiz-result.repository.js";
+import { MysqlMaterialRepository } from "./materials/material.repository.js";
+import { createMaterialRouter } from "./materials/material.routes.js";
+import { MaterialService } from "./materials/material.service.js";
+import { MysqlPracticeRepository } from "./practice/practice.repository.js";
+import { createPracticeRouter } from "./practice/practice.routes.js";
+import { PracticeService } from "./practice/practice.service.js";
+import { createQuizResultRouter } from "./results/quiz-result.routes.js";
+import { QuizResultService } from "./results/quiz-result.service.js";
 import { PlayerIdentityService } from "./users/player-identity.service.js";
 import { toGameManagerQuestions } from "./quizzes/quiz-content.mapper.js";
 import { MysqlQuizContentRepository } from "./quizzes/quiz-content.repository.js";
@@ -101,6 +113,13 @@ const gameAttendanceService = new GameAttendanceService(
   playerIdentityService,
   attendanceService,
 );
+const materialService = new MaterialService(new MysqlMaterialRepository(), classRepository, groupRepository);
+const practiceService = new PracticeService(new MysqlPracticeRepository(), classRepository, groupRepository);
+const quizResultService = new QuizResultService(
+  new MysqlQuizResultRepository(),
+  quizSessionService,
+  playerIdentityService,
+);
 
 function getCodeParam(req: Request) {
   const { code } = req.params;
@@ -114,6 +133,7 @@ interface CreateGameRequest {
   quizId: string;
   classId: string;
   mode: QuizSessionMode;
+  durationSeconds: number;
 }
 
 class CreateGameRequestError extends Error {}
@@ -125,13 +145,23 @@ function parseCreateGameRequest(body: unknown): CreateGameRequest {
 
   const quizId = parsePositiveId(record.quizId, "quizId");
   const classId = parsePositiveId(record.classId, "classId");
-  const mode = record.mode === undefined ? "PRACTICE" : record.mode;
+  const mode = record.mode === undefined ? "LIVE" : record.mode;
 
   if (typeof mode !== "string" || !QUIZ_SESSION_MODES.includes(mode as QuizSessionMode)) {
-    throw new CreateGameRequestError("mode must be OFFICIAL or PRACTICE");
+    throw new CreateGameRequestError("mode must be LIVE or PRACTICE");
   }
 
-  return { quizId, classId, mode: mode as QuizSessionMode };
+  const durationSeconds = record.durationSeconds === undefined ? DEFAULT_QUESTION_SECONDS : record.durationSeconds;
+  if (
+    typeof durationSeconds !== "number" ||
+    !Number.isInteger(durationSeconds) ||
+    durationSeconds < MIN_QUESTION_SECONDS ||
+    durationSeconds > MAX_QUESTION_SECONDS
+  ) {
+    throw new CreateGameRequestError(`durationSeconds must be an integer between ${MIN_QUESTION_SECONDS} and ${MAX_QUESTION_SECONDS}`);
+  }
+
+  return { quizId, classId, mode: mode as QuizSessionMode, durationSeconds };
 }
 
 function parsePositiveId(value: unknown, name: string): string {
@@ -177,6 +207,9 @@ app.use("/groups", createGroupRouter(guards, groupService, classService));
 app.use("/classes", createClassRouter(guards, classService));
 app.use("/modules", createModuleRouter(guards, classService));
 app.use(createAttendanceRouter(guards, attendanceService));
+app.use(createQuizResultRouter(guards, quizResultService));
+app.use(createMaterialRouter(guards, materialService));
+app.use(createPracticeRouter(guards, practiceService));
 app.use("/host/quizzes", createHostQuizRouter(requireHost, (req) => getAuthUser(req)?.id ?? null, quizContentService));
 
 // Una sesión de juego = un quiz guardado + la clase (y por lo tanto el grupo
@@ -209,7 +242,7 @@ app.post("/games", requireHost, async (req, res, next) => {
       return;
     }
 
-    const createdGame = createGame(toGameManagerQuestions(quiz));
+    const createdGame = createGame(toGameManagerQuestions(quiz), request.durationSeconds);
 
     try {
       await quizSessionService.create({
@@ -277,7 +310,7 @@ app.get("/games/:code", requireHost, (req, res) => {
   res.json(game);
 });
 
-app.post("/games/:code/start", requireHost, (req, res) => {
+app.post("/games/:code/start", requireHost, async (req, res) => {
   const game = startGame(getCodeParam(req));
 
   if (!game) {
@@ -285,6 +318,11 @@ app.post("/games/:code/start", requireHost, (req, res) => {
       message: "Game not found",
     });
   }
+
+  // Best-effort: si falla, el juego sigue igual.
+  await quizSessionService.markStarted(game.code).catch((error: unknown) => {
+    console.error("No se pudo marcar la sesión como iniciada", error);
+  });
 
   res.json(game);
 });
@@ -343,17 +381,23 @@ app.post("/games/:code/next", requireHost, async (req, res) => {
 
   const { game, justFinished } = result;
 
-  // Asistencia automática (best-effort): justo cuando la HOST avanza después
-  // de la última pregunta, el quiz termina y se registra PRESENT para las
-  // alumnas que participaron, si este juego tiene una quiz_session persistida.
-  // justFinished solo es true en ese paso, así que ocurre una vez por juego.
-  // Nunca bloquea ni rompe el avance: cualquier fallo queda solo logueado.
+  // Fin del quiz (best-effort): justo cuando la HOST avanza después de la
+  // última pregunta se registran la asistencia y los resultados de quienes
+  // participaron, y la sesión queda FINISHED. justFinished solo es true en
+  // ese paso, así que ocurre una vez por juego. Las tres partes corren en
+  // paralelo e independientes; nunca bloquean ni rompen el avance.
   if (justFinished) {
-    try {
-      await gameAttendanceService.registerAttendanceForFinishedGame(game.code, game.players);
-    } catch (error: unknown) {
-      console.error("Error registrando asistencia automática al terminar el juego", error);
-    }
+    const outcomes = await Promise.allSettled([
+      gameAttendanceService.registerAttendanceForFinishedGame(game.code, game.players),
+      quizResultService.saveLiveGameResults(game),
+      quizSessionService.markFinished(game.code),
+    ]);
+    outcomes.forEach((outcome, index) => {
+      if (outcome.status === "rejected") {
+        const what = ["la asistencia", "los resultados", "el fin de la sesión"][index];
+        console.error(`Error guardando ${what} al terminar el juego`, outcome.reason);
+      }
+    });
   }
 
   res.json(game);

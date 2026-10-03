@@ -1,5 +1,8 @@
-export const QUIZ_SESSION_MODES = ["OFFICIAL", "PRACTICE"] as const;
+// LIVE = juego en vivo con host; PRACTICE = práctica individual (Fase 3).
+export const QUIZ_SESSION_MODES = ["LIVE", "PRACTICE"] as const;
 export type QuizSessionMode = (typeof QUIZ_SESSION_MODES)[number];
+
+export type QuizSessionStatus = "WAITING" | "IN_PROGRESS" | "FINISHED";
 
 export interface CreateQuizSessionInput {
   quizId: string;
@@ -19,5 +22,5 @@ export interface QuizSession {
   groupId: string | null;
   gameCode: string;
   mode: QuizSessionMode;
-  status: "WAITING";
+  status: QuizSessionStatus;
 }

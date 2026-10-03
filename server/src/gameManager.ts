@@ -5,7 +5,9 @@ import type { Question } from "./types/Question.js";
 
 
 const games = new Map<string, Game>();
-const QUESTION_DURATION_SECONDS = 22;
+export const DEFAULT_QUESTION_SECONDS = 22;
+export const MIN_QUESTION_SECONDS = 5;
+export const MAX_QUESTION_SECONDS = 300;
 
 function cloneQuestions(
   questions: Question[]
@@ -13,13 +15,17 @@ function cloneQuestions(
   return questions.map(question => ({
     ...question,
     options: [...question.options],
+    ...(question.optionIds ? { optionIds: [...question.optionIds] } : {}),
     answers: [...question.answers],
   }));
 }
 
 // Las preguntas siempre vienen de un quiz guardado en la BD.
+// La host elige los segundos por pregunta al crear el juego (más tiempo =
+// más puntos posibles, es intencional).
 export function createGame(
   suppliedQuestions: Question[],
+  questionDurationSeconds: number = DEFAULT_QUESTION_SECONDS,
 ) {
   const questions = cloneQuestions(suppliedQuestions);
 
@@ -30,7 +36,7 @@ export function createGame(
   players: [],
   questions,
   currentQuestion: -1,
-  questionDurationSeconds: QUESTION_DURATION_SECONDS,
+  questionDurationSeconds,
 };
 
   games.set(code, game);
@@ -73,6 +79,7 @@ export function joinGame(code: string, playerName: string) {
       name: playerName,
       score: 0,
       answeredQuestions: [],
+      answers: [],
     };
     game.players.push(player);
   }
@@ -92,6 +99,7 @@ export function startGame(code: string, now: number = Date.now()) {
   if (game.currentQuestion < 0) {
     game.currentQuestion = 0;
     game.questionStartedAt = now;
+    game.startedAt = now;
   }
 
   return game;
@@ -188,10 +196,12 @@ export function submitAnswer(
   const remaining = remainingMs(game, now);
   const timeUp = remaining <= -ANSWER_GRACE_MS;
   const validAnswer = Number.isInteger(answer) && answer >= 0 && answer < question.options.length;
+  const responseMs = Math.max(0, game.questionDurationSeconds * 1000 - remaining);
 
   player.answeredQuestions.push(question.id);
 
   if (timeUp || !validAnswer) {
+    player.answers.push({ questionId: question.id, optionIndex: null, correct: false, points: 0, responseMs });
     return { status: "OK", correct: false, alreadyAnswered: false, timeUp, score: player.score, ...reveal };
   }
 
@@ -199,10 +209,11 @@ export function submitAnswer(
   question.answers[answer] = (question.answers[answer] ?? 0) + 1;
 
   const correct = answer === question.correctAnswer;
-  if (correct) {
-    const secondsLeft = Math.min(Math.max(0, Math.ceil(remaining / 1000)), game.questionDurationSeconds);
-    player.score += secondsLeft * 100;
-  }
+  const points = correct
+    ? Math.min(Math.max(0, Math.ceil(remaining / 1000)), game.questionDurationSeconds) * 100
+    : 0;
+  player.score += points;
+  player.answers.push({ questionId: question.id, optionIndex: answer, correct, points, responseMs });
 
   return { status: "OK", correct, alreadyAnswered: false, timeUp: false, score: player.score, ...reveal };
 }

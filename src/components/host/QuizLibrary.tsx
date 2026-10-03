@@ -11,6 +11,7 @@ export default function QuizLibrary({ api }: { api: HostFetch }) {
   const { quizzes, error, reload } = useSavedQuizzes(api);
   const [search, setSearch] = useState("");
   const [openQuizId, setOpenQuizId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
 
   const openQuiz = quizzes.find((quiz) => quiz.id === openQuizId) ?? null;
   const normalizedSearch = search.trim().toLowerCase();
@@ -20,6 +21,11 @@ export default function QuizLibrary({ api }: { api: HostFetch }) {
     quiz.className.toLowerCase().includes(normalizedSearch),
   );
 
+  // Recién creada (copia): todavía no aparece en la lista recargada.
+  if (openQuizId && !openQuiz && !error) {
+    return <section className={panelClass}><p className="text-slate-400">Abriendo...</p></section>;
+  }
+
   if (openQuiz) {
     return (
       <section className={panelClass}>
@@ -27,13 +33,21 @@ export default function QuizLibrary({ api }: { api: HostFetch }) {
           ← Volver a la lista
         </button>
         <h2 className="text-2xl font-bold mb-6">Editar quiz</h2>
+        {notice && <p className="mb-4 rounded-xl bg-green-500/15 p-3 text-sm text-green-200">{notice}</p>}
         <QuizEditor
           key={openQuiz.id}
           api={api}
           quizId={openQuiz.id}
           classId={openQuiz.classId}
           classLabel={`${openQuiz.groupName ?? ""} · ${formatClassDate(openQuiz.classDate)} — ${openQuiz.className}`}
-          onSaved={reload}
+          // Si se guardó como copia, abre la copia recién creada y lo avisa.
+          onSaved={(saved) => {
+            reload();
+            if (saved.id !== openQuiz.id) {
+              setNotice(`✓ Se creó «${saved.title}». El quiz original y sus resultados no cambiaron.`);
+              setOpenQuizId(saved.id);
+            }
+          }}
           onDeleted={() => { setOpenQuizId(null); reload(); }}
           onCancel={() => setOpenQuizId(null)}
         />
@@ -66,14 +80,21 @@ export default function QuizLibrary({ api }: { api: HostFetch }) {
           <tbody>
             {visibleQuizzes.map((quiz) => (
               <tr key={quiz.id} className="border-t border-white/10">
-                <td className="py-3 pr-4 font-semibold">{quiz.title}</td>
+                <td className="py-3 pr-4 font-semibold">
+                  {quiz.title}
+                  {quiz.hasResults && (
+                    <span className="ml-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-normal text-amber-200" title="Ya se jugó: al editarlo se guarda una copia">
+                      📊 con resultados
+                    </span>
+                  )}
+                </td>
                 <td className="py-3 pr-4 text-slate-300">
                   {quiz.className}
                   <span className="text-slate-500"> · {formatClassDate(quiz.classDate)}{quiz.groupName ? ` · ${quiz.groupName}` : ""}</span>
                 </td>
                 <td className="py-3 pr-4">{quiz.questionCount}</td>
                 <td className="py-3 text-right">
-                  <button onClick={() => setOpenQuizId(quiz.id)} className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1">
+                  <button onClick={() => { setNotice(""); setOpenQuizId(quiz.id); }} className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1">
                     Abrir
                   </button>
                 </td>

@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { ClassRepository } from "../classes/class.repository.js";
 import type { ClassItem } from "../classes/class.types.js";
-import type { CreateGroupInput, Group, GroupStudent } from "../groups/group.types.js";
+import type { CreateGroupInput, Group, GroupStudent, GroupMembership } from "../groups/group.types.js";
 import type { GroupRepository } from "../groups/group.repository.js";
 import type { QuizContent, QuizSummary } from "../quizzes/quiz-content.types.js";
 import type { QuizContentRepository } from "../quizzes/quiz-content.repository.js";
@@ -75,6 +75,7 @@ class FakeQuizContentRepository implements QuizContentRepository {
   async findAll(): Promise<QuizSummary[]> { return []; }
   async update(): Promise<QuizContent | null> { throw new Error("not used in these tests"); }
   async delete(): Promise<boolean> { throw new Error("not used in these tests"); }
+  async hasResults(): Promise<boolean> { return false; }
 }
 
 class FakeQuizSessionRepository implements QuizSessionRepository {
@@ -88,7 +89,7 @@ class FakeQuizSessionRepository implements QuizSessionRepository {
       classId: classItem?.id ?? null,
       groupId: classItem?.groupId ?? null,
       gameCode,
-      mode: "PRACTICE",
+      mode: "LIVE",
       status: "WAITING",
     });
   }
@@ -102,6 +103,9 @@ class FakeQuizSessionRepository implements QuizSessionRepository {
   async findByGameCode(gameCode: string): Promise<QuizSession | null> {
     return this.sessionsByGameCode.get(gameCode) ?? null;
   }
+
+  async markStarted(): Promise<void> {}
+  async markFinished(): Promise<void> {}
 }
 
 class FakeUserRepository implements UserRepository {
@@ -124,6 +128,8 @@ class FakeUserRepository implements UserRepository {
 }
 
 class FakeGroupRepository implements GroupRepository {
+  async findAllMemberships(): Promise<GroupMembership[]> { return []; }
+  async setOnlyGroup(): Promise<void> {}
   async create(input: CreateGroupInput): Promise<Group> { return { id: "10", name: input.name, createdAt: "2026-01-01T00:00:00.000Z" }; }
   async findById(): Promise<Group | null> { return { id: existingClass.groupId, name: "Grupo 1", createdAt: "2026-01-01T00:00:00.000Z" }; }
   async findByName(): Promise<Group | null> { return null; }

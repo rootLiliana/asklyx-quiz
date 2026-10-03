@@ -6,6 +6,9 @@ import type { CreateQuizContent, CreateQuizContentInput, QuizContent, QuizSummar
 
 export class QuizContentInputError extends Error {}
 export class QuizContentNotFoundError extends Error {}
+// El quiz ya se jugó y tiene resultados: editarlo o borrarlo los alteraría.
+// Para cambiarlo se guarda como copia (un quiz nuevo).
+export class QuizContentHasResultsError extends Error {}
 export class QuizContentClassNotFoundError extends Error {}
 
 export class QuizContentService {
@@ -21,7 +24,12 @@ export class QuizContentService {
   // Reemplaza título, clase y preguntas de un quiz ya guardado. createdBy se
   // conserva tal cual quedó al crearlo (no se modifica en la tabla).
   async update(id: string, input: CreateQuizContentInput): Promise<QuizContent> {
-    const quiz = await this.quizzes.update(validateQuizId(id), await this.prepareContent(input));
+    const validId = validateQuizId(id);
+    if (!(await this.getById(validId))) {
+      throw new QuizContentNotFoundError("Quiz not found");
+    }
+    await this.assertWithoutResults(validId, "edited");
+    const quiz = await this.quizzes.update(validId, await this.prepareContent(input));
 
     if (!quiz) {
       throw new QuizContentNotFoundError("Quiz not found");
@@ -31,10 +39,25 @@ export class QuizContentService {
   }
 
   async delete(id: string): Promise<void> {
-    const deleted = await this.quizzes.delete(validateQuizId(id));
+    const validId = validateQuizId(id);
+    if (!(await this.getById(validId))) {
+      throw new QuizContentNotFoundError("Quiz not found");
+    }
+    await this.assertWithoutResults(validId, "deleted");
+    const deleted = await this.quizzes.delete(validId);
 
     if (!deleted) {
       throw new QuizContentNotFoundError("Quiz not found");
+    }
+  }
+
+  hasResults(id: string): Promise<boolean> {
+    return this.quizzes.hasResults(validateQuizId(id));
+  }
+
+  private async assertWithoutResults(id: string, action: "edited" | "deleted"): Promise<void> {
+    if (await this.quizzes.hasResults(id)) {
+      throw new QuizContentHasResultsError(`The quiz already has results and cannot be ${action}; save it as a copy instead`);
     }
   }
 
@@ -68,8 +91,11 @@ export class QuizContentService {
     };
   }
 
-  getById(id: string): Promise<QuizContent | null> {
-    return this.quizzes.findById(validateQuizId(id));
+  // Solo quizzes en vivo: uno de práctica es "no encontrado" aquí (así no se
+  // puede jugar en vivo, editar ni borrar desde la biblioteca del Host).
+  async getById(id: string): Promise<QuizContent | null> {
+    const quiz = await this.quizzes.findById(validateQuizId(id));
+    return quiz && quiz.kind !== "PRACTICE" ? quiz : null;
   }
 
   async getGameManagerQuestions(id: string): Promise<Question[] | null> {
