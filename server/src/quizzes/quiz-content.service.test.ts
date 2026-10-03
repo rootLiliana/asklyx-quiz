@@ -264,3 +264,16 @@ test("a quiz that already has results cannot be edited or deleted (it is saved a
   assert.equal(copy.title, "Python (copia)");
   assert.equal(copy.questions.length, 1);
 });
+
+test("practice quizzes are invisible to the live quiz module: cannot be played, edited or deleted from it", async () => {
+  const repository = new FakeQuizContentRepository();
+  const service = buildService(repository);
+  await service.create({ classId: existingClass.id, title: "Práctica", createdBy: "2", questions });
+  const stored = await repository.findById("900");
+  assert.ok(stored);
+  stored.kind = "PRACTICE";
+
+  assert.equal(await service.getById("900"), null);
+  await assert.rejects(service.update("900", { classId: existingClass.id, title: "x", createdBy: "2", questions }), QuizContentNotFoundError);
+  await assert.rejects(service.delete("900"), QuizContentNotFoundError);
+});

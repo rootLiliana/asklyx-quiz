@@ -4,8 +4,9 @@ import { fieldClass, labelClass, panelClass } from "../../lib/hostStyles";
 import type { ClassSummary, HostFetch } from "../../types/Host";
 import type { CodeLanguage, Material, MaterialBlock } from "../../types/Material";
 import MaterialView from "../material/MaterialView";
-
-type PublishMode = "draft" | "published" | "scheduled";
+import { initialScheduledAt, publishModeOf, resolvePublishedAt, scheduleProblem, type PublishMode } from "../../lib/publishing";
+import PracticeManager from "./PracticeManager";
+import { PublishPicker, StatusBadge } from "./Publishing";
 
 // Bloque en edición: `key` estable para React aunque se reordenen.
 type EditableBlock = MaterialBlock & { key: string };
@@ -26,31 +27,6 @@ function toBlock(block: EditableBlock): MaterialBlock {
   return { type: "link", url: block.url.trim(), label: block.label.trim() };
 }
 
-// "2026-10-05T18:00" (hora local) <-> ISO.
-function toLocalInput(iso: string): string {
-  const date = new Date(iso);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("es-MX", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-function publishModeOf(publishedAt: string | null): PublishMode {
-  if (!publishedAt) return "draft";
-  return new Date(publishedAt).getTime() > Date.now() ? "scheduled" : "published";
-}
-
-function StatusBadge({ publishedAt }: { publishedAt: string | null }) {
-  const mode = publishModeOf(publishedAt);
-  if (mode === "draft") return <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">📝 Borrador</span>;
-  if (mode === "scheduled") {
-    return <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs text-blue-200">🗓️ Se publica {formatDateTime(publishedAt!)}</span>;
-  }
-  return <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-200">✅ Publicado</span>;
-}
-
 function validate(title: string, blocks: EditableBlock[], mode: PublishMode, scheduledAt: string): string {
   if (!title.trim()) return "Escribe un título.";
   if (blocks.length === 0) return "Agrega al menos un bloque.";
@@ -60,8 +36,7 @@ function validate(title: string, blocks: EditableBlock[], mode: PublishMode, sch
     if (block.type === "code" && !block.code.trim()) return `${where}: escribe el código o quita el bloque.`;
     if (block.type === "link" && !/^https?:\/\/\S+$/i.test(block.url.trim())) return `${where}: el enlace debe empezar con https://`;
   }
-  if (mode === "scheduled" && (!scheduledAt || Number.isNaN(new Date(scheduledAt).getTime()))) return "Elige la fecha y hora de publicación.";
-  return "";
+  return scheduleProblem(mode, scheduledAt);
 }
 
 function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
@@ -76,9 +51,7 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
     material ? material.blocks.map((block) => ({ ...block, key: crypto.randomUUID() })) : [newBlock("text")],
   );
   const [mode, setMode] = useState<PublishMode>(() => publishModeOf(material?.publishedAt ?? null));
-  const [scheduledAt, setScheduledAt] = useState(() =>
-    material?.publishedAt && publishModeOf(material.publishedAt) === "scheduled" ? toLocalInput(material.publishedAt) : "",
-  );
+  const [scheduledAt, setScheduledAt] = useState(() => initialScheduledAt(material?.publishedAt ?? null));
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -101,12 +74,7 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
     const problem = validate(title, blocks, mode, scheduledAt);
     if (problem) { setError(problem); return; }
 
-    // Publicado: conserva la fecha original si ya lo estaba; si no, desde ahora.
-    const publishedAt =
-      mode === "draft" ? null
-        : mode === "scheduled" ? new Date(scheduledAt).toISOString()
-          : material?.publishedAt && publishModeOf(material.publishedAt) === "published" ? material.publishedAt
-            : new Date().toISOString();
+    const publishedAt = resolvePublishedAt(mode, scheduledAt, material?.publishedAt ?? null);
 
     setSaving(true);
     setError("");
@@ -242,31 +210,8 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
         </>
       )}
 
-      <div className="mt-6 rounded-2xl bg-black/20 p-4">
-        <p className={labelClass}>¿Cuándo lo ven los alumnos?</p>
-        <div className="flex flex-wrap gap-2">
-          {([
-            ["draft", "📝 Borrador (no lo ven)"],
-            ["published", "✅ Publicado"],
-            ["scheduled", "🗓️ Programar"],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              onClick={() => setMode(value)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold ${mode === value ? "bg-fuchsia-600" : "bg-white/10 hover:bg-white/20"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {mode === "scheduled" && (
-          <input
-            type="datetime-local"
-            value={scheduledAt}
-            onChange={(e) => setScheduledAt(e.target.value)}
-            className={`${fieldClass} mt-3 sm:max-w-xs`}
-          />
-        )}
+      <div className="mt-6">
+        <PublishPicker mode={mode} onModeChange={setMode} scheduledAt={scheduledAt} onScheduledAtChange={setScheduledAt} />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -291,6 +236,8 @@ export default function MaterialsManager({ api, classItem, groupName, onBack }: 
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Material | "new" | null>(null);
   const [version, setVersion] = useState(0);
+  // Editando o viendo resultados de una práctica: se oculta el material.
+  const [practiceFocused, setPracticeFocused] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -329,8 +276,11 @@ export default function MaterialsManager({ api, classItem, groupName, onBack }: 
     );
   }
 
+  // PracticeManager siempre en la misma posición: así conserva su estado
+  // (lista / editor / resultados) cuando se oculta el material.
   return (
-    <section className={panelClass}>
+    <div className="grid grid-cols-1 gap-6">
+    {!practiceFocused && <section className={panelClass}>
       <button onClick={onBack} className="text-slate-400 hover:text-white text-sm mb-4">← Volver a clases</button>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
         <div className="min-w-0">
@@ -363,6 +313,8 @@ export default function MaterialsManager({ api, classItem, groupName, onBack }: 
           </div>
         ))}
       </div>
-    </section>
+    </section>}
+    <PracticeManager api={api} classId={classItem.id} onViewChange={setPracticeFocused} />
+    </div>
   );
 }

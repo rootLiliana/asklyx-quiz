@@ -18,6 +18,7 @@ interface QuizRow extends RowDataPacket {
   description: string | null;
   time_limit_seconds: number | null;
   created_by: number | string;
+  kind: string;
 }
 
 interface QuizSummaryRow extends RowDataPacket {
@@ -186,11 +187,11 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
   async findAll(classId?: string): Promise<QuizSummary[]> {
     const [rows] = classId
       ? await getDatabasePool().execute<QuizSummaryRow[]>(
-          `${SUMMARY_SELECT} WHERE q.class_id = ? ORDER BY c.class_date DESC, q.id DESC`,
+          `${SUMMARY_SELECT} WHERE q.kind = 'LIVE' AND q.class_id = ? ORDER BY c.class_date DESC, q.id DESC`,
           [classId],
         )
       : await getDatabasePool().execute<QuizSummaryRow[]>(
-          `${SUMMARY_SELECT} ORDER BY c.class_date DESC, q.id DESC`,
+          `${SUMMARY_SELECT} WHERE q.kind = 'LIVE' ORDER BY c.class_date DESC, q.id DESC`,
         );
 
     return rows.map(toQuizSummary);
@@ -198,7 +199,7 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
 
   async findById(id: string): Promise<QuizContent | null> {
     const [quizRows] = await getDatabasePool().execute<QuizRow[]>(
-      "SELECT id, class_id, title, description, time_limit_seconds, created_by FROM quizzes WHERE id = ? LIMIT 1",
+      "SELECT id, class_id, title, description, time_limit_seconds, created_by, kind FROM quizzes WHERE id = ? LIMIT 1",
       [id],
     );
     const quizRow = quizRows[0];
@@ -221,6 +222,7 @@ export class MysqlQuizContentRepository implements QuizContentRepository {
       description: quizRow.description,
       timeLimitSeconds: quizRow.time_limit_seconds,
       createdBy: String(quizRow.created_by),
+      kind: quizRow.kind === "PRACTICE" ? "PRACTICE" : "LIVE",
       questions: questions.map((question) => ({
         ...question,
         options: optionsByQuestion.get(question.id) ?? [],

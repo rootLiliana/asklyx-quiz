@@ -25,6 +25,9 @@ export class QuizContentService {
   // conserva tal cual quedó al crearlo (no se modifica en la tabla).
   async update(id: string, input: CreateQuizContentInput): Promise<QuizContent> {
     const validId = validateQuizId(id);
+    if (!(await this.getById(validId))) {
+      throw new QuizContentNotFoundError("Quiz not found");
+    }
     await this.assertWithoutResults(validId, "edited");
     const quiz = await this.quizzes.update(validId, await this.prepareContent(input));
 
@@ -37,6 +40,9 @@ export class QuizContentService {
 
   async delete(id: string): Promise<void> {
     const validId = validateQuizId(id);
+    if (!(await this.getById(validId))) {
+      throw new QuizContentNotFoundError("Quiz not found");
+    }
     await this.assertWithoutResults(validId, "deleted");
     const deleted = await this.quizzes.delete(validId);
 
@@ -85,8 +91,11 @@ export class QuizContentService {
     };
   }
 
-  getById(id: string): Promise<QuizContent | null> {
-    return this.quizzes.findById(validateQuizId(id));
+  // Solo quizzes en vivo: uno de práctica es "no encontrado" aquí (así no se
+  // puede jugar en vivo, editar ni borrar desde la biblioteca del Host).
+  async getById(id: string): Promise<QuizContent | null> {
+    const quiz = await this.quizzes.findById(validateQuizId(id));
+    return quiz && quiz.kind !== "PRACTICE" ? quiz : null;
   }
 
   async getGameManagerQuestions(id: string): Promise<Question[] | null> {

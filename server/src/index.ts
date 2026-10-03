@@ -51,6 +51,9 @@ import { MysqlQuizResultRepository } from "./results/quiz-result.repository.js";
 import { MysqlMaterialRepository } from "./materials/material.repository.js";
 import { createMaterialRouter } from "./materials/material.routes.js";
 import { MaterialService } from "./materials/material.service.js";
+import { MysqlPracticeRepository } from "./practice/practice.repository.js";
+import { createPracticeRouter } from "./practice/practice.routes.js";
+import { PracticeService } from "./practice/practice.service.js";
 import { createQuizResultRouter } from "./results/quiz-result.routes.js";
 import { QuizResultService } from "./results/quiz-result.service.js";
 import { PlayerIdentityService } from "./users/player-identity.service.js";
@@ -111,6 +114,7 @@ const gameAttendanceService = new GameAttendanceService(
   attendanceService,
 );
 const materialService = new MaterialService(new MysqlMaterialRepository(), classRepository, groupRepository);
+const practiceService = new PracticeService(new MysqlPracticeRepository(), classRepository, groupRepository);
 const quizResultService = new QuizResultService(
   new MysqlQuizResultRepository(),
   quizSessionService,
@@ -205,6 +209,7 @@ app.use("/modules", createModuleRouter(guards, classService));
 app.use(createAttendanceRouter(guards, attendanceService));
 app.use(createQuizResultRouter(guards, quizResultService));
 app.use(createMaterialRouter(guards, materialService));
+app.use(createPracticeRouter(guards, practiceService));
 app.use("/host/quizzes", createHostQuizRouter(requireHost, (req) => getAuthUser(req)?.id ?? null, quizContentService));
 
 // Una sesión de juego = un quiz guardado + la clase (y por lo tanto el grupo

@@ -11,6 +11,9 @@ export interface CreateQuizContentInput {
 
 export interface QuizContent {
   id: string;
+  // 'PRACTICE' = quiz de práctica (módulo practice/): este módulo solo
+  // maneja los de sesión en vivo.
+  kind?: "LIVE" | "PRACTICE";
   classId: string;
   title: string;
   description: string | null;

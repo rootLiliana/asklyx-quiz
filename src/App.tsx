@@ -13,6 +13,7 @@ const Podium = lazy(() => import("./pages/Podium"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const MyResults = lazy(() => import("./pages/MyResults"));
 const MyGroup = lazy(() => import("./pages/MyGroup"));
+const Practice = lazy(() => import("./pages/Practice"));
 
 function Loading() {
   return (
@@ -44,6 +45,8 @@ function App() {
           <Route path="/mis-resultados" element={<MyResults />} />
 
           <Route path="/mi-grupo" element={<MyGroup />} />
+
+          <Route path="/practica/:quizId" element={<Practice />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

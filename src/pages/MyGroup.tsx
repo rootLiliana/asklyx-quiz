@@ -4,7 +4,9 @@ import { motion } from "framer-motion";
 import MaterialView from "../components/material/MaterialView";
 import { formatClassDate, todayIsoDay, toIsoDay } from "../lib/classDates";
 import { studentFetch } from "../lib/studentSession";
+import { percentageTextClass } from "../lib/percentage";
 import type { Material, StudentClassMaterials } from "../types/Material";
+import type { StudentPracticeSummary } from "../types/Practice";
 
 function Shell({ children, onBack, backLabel }: { children: ReactNode; onBack: () => void; backLabel: string }) {
   return (
@@ -62,6 +64,7 @@ function MaterialReader({ materialId, onBack }: { materialId: string; onBack: ()
 export default function MyGroup() {
   const navigate = useNavigate();
   const [classes, setClasses] = useState<StudentClassMaterials[] | null>(null);
+  const [practice, setPractice] = useState<StudentPracticeSummary[]>([]);
   const [error, setError] = useState(false);
   const [showPast, setShowPast] = useState(false);
   const [openMaterialId, setOpenMaterialId] = useState<string | null>(null);
@@ -69,12 +72,17 @@ export default function MyGroup() {
   useEffect(() => {
     let cancelled = false;
 
-    studentFetch("/me/classes")
-      .then(async (response) => {
-        if (response.status === 401 || response.status === 403) { navigate("/join"); return; }
-        if (!response.ok) throw new Error(`status ${response.status}`);
-        const data: StudentClassMaterials[] = await response.json();
-        if (!cancelled) setClasses(data);
+    Promise.all([studentFetch("/me/classes"), studentFetch("/me/practice")])
+      .then(async ([classesResponse, practiceResponse]) => {
+        if ([classesResponse.status, practiceResponse.status].some((status) => status === 401 || status === 403)) {
+          navigate("/join");
+          return;
+        }
+        if (!classesResponse.ok) throw new Error(`status ${classesResponse.status}`);
+        const data: StudentClassMaterials[] = await classesResponse.json();
+        // Si la práctica falla, igual se muestran las clases y el material.
+        const practiceData: StudentPracticeSummary[] = practiceResponse.ok ? await practiceResponse.json() : [];
+        if (!cancelled) { setClasses(data); setPractice(practiceData); }
       })
       .catch((err: unknown) => {
         console.error("Error cargando mis clases:", err);
@@ -153,7 +161,7 @@ export default function MyGroup() {
                     ) : null}
                   </div>
 
-                  {classItem.materials.length > 0 ? (
+                  {classItem.materials.length > 0 || practice.some((item) => item.classId === classItem.id) ? (
                     <div className="mt-3 grid grid-cols-1 gap-2">
                       {classItem.materials.map((material) => (
                         <button
@@ -163,6 +171,29 @@ export default function MyGroup() {
                         >
                           <span className="text-xl">📖</span>
                           <span className="font-semibold break-words">{material.title}</span>
+                        </button>
+                      ))}
+                      {practice.filter((item) => item.classId === classItem.id).map((item) => (
+                        <button
+                          key={`practice-${item.quizId}`}
+                          onClick={() => navigate(`/practica/${item.quizId}`)}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-left hover:bg-fuchsia-500/20"
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <span className="text-xl">✏️</span>
+                            <span className="min-w-0">
+                              <span className="block font-semibold break-words">{item.title}</span>
+                              <span className="block text-xs text-white/60">Práctica · {item.questionCount} preguntas</span>
+                            </span>
+                          </span>
+                          {item.bestPercentage !== null ? (
+                            <span className={`shrink-0 text-right text-sm font-black ${percentageTextClass(item.bestPercentage)}`}>
+                              {item.bestPercentage}%
+                              <span className="block text-[10px] font-normal text-white/50">tu mejor</span>
+                            </span>
+                          ) : (
+                            <span className="shrink-0 rounded-full bg-fuchsia-500/30 px-2 py-0.5 text-xs">Nuevo</span>
+                          )}
                         </button>
                       ))}
                     </div>
