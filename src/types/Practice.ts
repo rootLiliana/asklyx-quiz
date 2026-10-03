@@ -78,3 +78,18 @@ export const PRACTICE_TYPE_LABEL: Record<PracticeQuestionType, string> = {
   CODE_OUTPUT: "🖨️ ¿Qué imprime este código?",
   CODE_WRITING: "💻 Escribe el código",
 };
+
+export interface PracticeSummary {
+  correctAnswers: number;
+  totalQuestions: number;
+  percentage: number;
+}
+
+// Quien califica una práctica: el servidor (alumnos) o el navegador (vista
+// previa del Host). Si algo falla, lanza un Error con el mensaje a mostrar.
+export interface PracticeEngine {
+  start(): Promise<PublicPracticeQuiz>;
+  answer(input: { questionId: string; optionId: string | null; answerText: string; selfAssessment?: boolean }): Promise<AnswerFeedback>;
+  reveal(questionId: string, answerText: string): Promise<{ modelSolution: string; explanation: string | null }>;
+  finish(): Promise<PracticeSummary>;
+}

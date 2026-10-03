@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { fieldClass, labelClass, panelClass } from "../../lib/hostStyles";
 import { percentageTextClass } from "../../lib/percentage";
 import { initialScheduledAt, publishModeOf, resolvePublishedAt, scheduleProblem, type PublishMode } from "../../lib/publishing";
 import type { HostFetch } from "../../types/Host";
 import {
   PRACTICE_TYPE_LABEL,
+  type AnswerFeedback,
+  type PracticeEngine,
   type PracticeQuestionType,
   type PracticeQuiz,
   type PracticeQuizSummary,
   type PracticeStudentStat,
+  type PublicPracticeQuiz,
 } from "../../types/Practice";
+import { outputMatches, shortAnswerMatches } from "../../lib/practiceGrading";
+import PracticePlayer from "../practice/PracticePlayer";
 import { PublishPicker, StatusBadge } from "./Publishing";
 
 const codeFieldClass = `${fieldClass} font-mono text-sm`;
@@ -231,6 +237,85 @@ function QuestionEditor({ question, index, total, onChange, onMove, onRemove }: 
   );
 }
 
+// "Probar como alumno": misma pantalla que el alumno, calificada en el
+// navegador con lo que hay en el editor (aunque no esté guardado). No guarda
+// intentos ni cuenta en las estadísticas.
+function previewEngine(title: string, questions: EditableQuestion[]): { quiz: PublicPracticeQuiz; engine: PracticeEngine } {
+  const quiz: PublicPracticeQuiz = {
+    id: "preview",
+    title: title.trim() || "Sin título",
+    questions: questions.map((question) => ({
+      id: question.key,
+      type: question.type,
+      text: question.text,
+      code: question.code.trim() ? question.code : null,
+      options: question.type === "MULTIPLE_CHOICE" ? question.options.map((option) => ({ id: option.key, text: option.text })) : [],
+    })),
+  };
+  const results = new Map<string, boolean>();
+  const accepted = (question: EditableQuestion) => question.acceptedAnswers.filter((value) => value.trim());
+
+  const engine: PracticeEngine = {
+    async start() {
+      results.clear();
+      return quiz;
+    },
+    async answer({ questionId, optionId, answerText, selfAssessment }) {
+      const question = questions.find((item) => item.key === questionId);
+      if (!question) throw new Error("Pregunta no encontrada.");
+      const feedback: AnswerFeedback = { correct: false, explanation: question.explanation.trim() || null };
+
+      if (question.type === "MULTIPLE_CHOICE") {
+        const correctOption = question.options.find((option) => option.isCorrect);
+        feedback.correct = correctOption?.key === optionId;
+        if (correctOption) feedback.correctOptionId = correctOption.key;
+      } else if (question.type === "CODE_WRITING") {
+        feedback.correct = selfAssessment === true;
+        feedback.modelSolution = question.modelSolution;
+      } else {
+        const options = accepted(question);
+        feedback.correct = question.type === "SHORT_ANSWER" ? shortAnswerMatches(answerText, options) : outputMatches(answerText, options);
+        if (options[0] !== undefined) feedback.expectedAnswer = options[0];
+      }
+
+      results.set(questionId, feedback.correct);
+      return feedback;
+    },
+    async reveal(questionId) {
+      const question = questions.find((item) => item.key === questionId);
+      return { modelSolution: question?.modelSolution ?? "", explanation: question?.explanation.trim() || null };
+    },
+    async finish() {
+      const correctAnswers = [...results.values()].filter(Boolean).length;
+      const totalQuestions = questions.length;
+      return { correctAnswers, totalQuestions, percentage: totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0 };
+    },
+  };
+
+  return { quiz, engine };
+}
+
+function PreviewOverlay({ title, questions, onClose }: { title: string; questions: EditableQuestion[]; onClose: () => void }) {
+  const [{ quiz, engine }] = useState(() => previewEngine(title, questions));
+
+  // Portal al <body>: dentro del panel, el backdrop-blur de las tarjetas
+  // encerraría el "fixed" en la tarjeta en vez de cubrir toda la pantalla.
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-gradient-to-br from-purple-900 via-indigo-900 to-black px-4 py-6 sm:p-8">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+          <span>👀 <strong>Vista previa:</strong> así lo verán los alumnos. Nada se guarda.</span>
+          <button onClick={onClose} className="rounded-lg bg-white/15 px-3 py-1 font-semibold text-white hover:bg-white/25">Cerrar vista previa</button>
+        </div>
+        <div className="rounded-3xl bg-white/10 p-5 text-white shadow-2xl backdrop-blur-md sm:p-8">
+          <PracticePlayer quiz={quiz} engine={engine} onExit={onClose} exitLabel="Cerrar vista previa" />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function PracticeEditor({ api, classId, quizId, onSaved, onCancel }: {
   api: HostFetch;
   classId: string;
@@ -246,6 +331,7 @@ function PracticeEditor({ api, classId, quizId, onSaved, onCancel }: {
   const [scheduledAt, setScheduledAt] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     if (!quizId) return;
@@ -283,6 +369,13 @@ function PracticeEditor({ api, classId, quizId, onSaved, onCancel }: {
       [next[index], next[target]] = [next[target]!, next[index]!];
       return next;
     });
+  };
+
+  const openPreview = () => {
+    const problem = validate(title, questions);
+    if (problem) { setError(`Para probarlo: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`); return; }
+    setError("");
+    setPreviewing(true);
   };
 
   const save = async () => {
@@ -356,7 +449,10 @@ function PracticeEditor({ api, classId, quizId, onSaved, onCancel }: {
         <PublishPicker mode={mode} onModeChange={setMode} scheduledAt={scheduledAt} onScheduledAtChange={setScheduledAt} />
       </div>
 
+      {previewing && <PreviewOverlay title={title} questions={questions} onClose={() => setPreviewing(false)} />}
+
       <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button onClick={openPreview} className="rounded-xl bg-amber-500 hover:bg-amber-400 px-5 py-3 font-bold text-purple-950">👀 Probar como alumno</button>
         <button onClick={() => void save()} disabled={saving} className="rounded-xl bg-green-600 hover:bg-green-500 px-5 py-3 font-bold disabled:opacity-50">
           {saving ? "Guardando..." : "Guardar práctica"}
         </button>
