@@ -297,7 +297,7 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
   };
 
   const remove = async (classItem: ClassSummary) => {
-    if (!window.confirm(`¿Borrar la clase "${classItem.name}" del ${formatClassDate(classItem.classDate)}? También se borrará su material.`)) return;
+    if (!window.confirm(`¿Borrar la clase "${classItem.name}" del ${formatClassDate(classItem.classDate)}? Su material y su práctica son de la sesión y se conservan.`)) return;
 
     const response = await api(`/classes/${classItem.id}`, { method: "DELETE" });
     if (response.status === 409) {
@@ -331,7 +331,11 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
       <MaterialsManager
         api={api}
         classItem={materialsFor}
-        groupName={groupName(materialsFor.groupId)}
+        sharedWith={catalog.classes
+          .filter((classItem) => classItem.id === materialsFor.id || (materialsFor.lessonId && classItem.lessonId === materialsFor.lessonId))
+          .sort((a, b) => (toIsoDay(a.classDate) ?? "").localeCompare(toIsoDay(b.classDate) ?? ""))
+          .map((classItem) => `${groupName(classItem.groupId)} (${formatClassDate(classItem.classDate)})`)
+          .join(" y ")}
         onBack={() => setMaterialsFor(null)}
       />
     );

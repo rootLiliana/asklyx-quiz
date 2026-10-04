@@ -22,9 +22,12 @@ export interface PracticeQuestion {
   modelSolution: string | null;
 }
 
+// La práctica es de la sesión (lesson): la ven todos los grupos que la tienen.
+// classId = clase desde donde se creó (dato de referencia).
 export interface PracticeQuiz {
   id: string;
   classId: string;
+  lessonId: string | null;
   title: string;
   publishedAt: string | null;
   createdBy: string;
@@ -90,7 +93,9 @@ export interface PublicPracticeQuiz {
 
 export interface StudentPracticeSummary {
   quizId: string;
-  classId: string;
+  lessonId: string;
+  // Nombre de la sesión (p. ej. "Sesión 3 - Agrupamientos").
+  lessonName: string;
   title: string;
   questionCount: number;
   attempts: number;

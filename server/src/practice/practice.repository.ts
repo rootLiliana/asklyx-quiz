@@ -21,6 +21,7 @@ export class PracticeAlreadyAnsweredError extends Error {}
 interface QuizRow extends RowDataPacket {
   id: number | string;
   class_id: number | string;
+  lesson_id: number | string | null;
   title: string;
   published_at: Date | string | null;
   created_by: number | string;
@@ -75,9 +76,9 @@ function isDatabaseError(error: unknown, code: string): boolean {
 const PERCENT = "a.correct_answers * 100 / NULLIF(a.total_questions, 0)";
 
 export interface PracticeRepository {
-  listForClass(classId: string): Promise<PracticeQuizSummary[]>;
+  listForLesson(lessonId: string): Promise<PracticeQuizSummary[]>;
   findById(id: string): Promise<PracticeQuiz | null>;
-  create(classId: string, input: PracticeQuizInput, createdBy: string): Promise<string>;
+  create(classId: string, lessonId: string, input: PracticeQuizInput, createdBy: string): Promise<string>;
   update(id: string, input: PracticeQuizInput): Promise<void>;
   // false si no existe. PracticeInUseError si ya tiene intentos.
   delete(id: string): Promise<boolean>;
@@ -85,7 +86,9 @@ export interface PracticeRepository {
 
   listForStudent(userId: string, now: Date): Promise<StudentPracticeSummary[]>;
   // La quiz_session permanente (mode PRACTICE) de ese quiz; la crea si no existe.
-  ensureSession(quiz: PracticeQuiz, groupId: string): Promise<string>;
+  ensureSession(quiz: PracticeQuiz): Promise<string>;
+  // ¿La alumna está en algún grupo que tiene una clase de esa sesión?
+  isLessonVisibleTo(lessonId: string, userId: string): Promise<boolean>;
   createAttempt(sessionId: string, studentId: string, totalQuestions: number): Promise<string>;
   findAttempt(id: string): Promise<PracticeAttempt | null>;
   saveAnswer(attemptId: string, answer: { questionId: string; optionId: string | null; answerText: string | null; isCorrect: boolean; selfAssessed: boolean }): Promise<void>;
@@ -94,22 +97,22 @@ export interface PracticeRepository {
 }
 
 export class MysqlPracticeRepository implements PracticeRepository {
-  async listForClass(classId: string): Promise<PracticeQuizSummary[]> {
+  async listForLesson(lessonId: string): Promise<PracticeQuizSummary[]> {
     const database = getDatabasePool();
     const [[quizRows], [bestRows]] = await Promise.all([
       database.execute<RowDataPacket[]>(
         `SELECT q.id, q.title, q.published_at, (SELECT COUNT(*) FROM questions qu WHERE qu.quiz_id = q.id) AS question_count
-         FROM quizzes q WHERE q.class_id = ? AND q.kind = 'PRACTICE' ORDER BY q.id ASC`,
-        [classId],
+         FROM quizzes q WHERE q.lesson_id = ? AND q.kind = 'PRACTICE' ORDER BY q.id ASC`,
+        [lessonId],
       ),
       database.execute<BestRow[]>(
         `SELECT s.quiz_id, a.student_id, COUNT(*) AS attempts, MAX(${PERCENT}) AS best
          FROM quiz_attempts a
          JOIN quiz_sessions s ON s.id = a.session_id AND s.mode = 'PRACTICE'
          JOIN quizzes q ON q.id = s.quiz_id
-         WHERE q.class_id = ? AND a.completed_at IS NOT NULL
+         WHERE q.lesson_id = ? AND a.completed_at IS NOT NULL
          GROUP BY s.quiz_id, a.student_id`,
-        [classId],
+        [lessonId],
       ),
     ]);
 
@@ -133,7 +136,7 @@ export class MysqlPracticeRepository implements PracticeRepository {
   async findById(id: string): Promise<PracticeQuiz | null> {
     const database = getDatabasePool();
     const [quizRows] = await database.execute<QuizRow[]>(
-      "SELECT id, class_id, title, published_at, created_by FROM quizzes WHERE id = ? AND kind = 'PRACTICE' LIMIT 1",
+      "SELECT id, class_id, lesson_id, title, published_at, created_by FROM quizzes WHERE id = ? AND kind = 'PRACTICE' LIMIT 1",
       [id],
     );
     const quiz = quizRows[0];
@@ -156,6 +159,7 @@ export class MysqlPracticeRepository implements PracticeRepository {
     return {
       id: String(quiz.id),
       classId: String(quiz.class_id),
+      lessonId: quiz.lesson_id === null ? null : String(quiz.lesson_id),
       title: quiz.title,
       publishedAt: toIso(quiz.published_at),
       createdBy: String(quiz.created_by),
@@ -174,11 +178,11 @@ export class MysqlPracticeRepository implements PracticeRepository {
     };
   }
 
-  async create(classId: string, input: PracticeQuizInput, createdBy: string): Promise<string> {
+  async create(classId: string, lessonId: string, input: PracticeQuizInput, createdBy: string): Promise<string> {
     return this.inTransaction(async (connection) => {
       const [result] = await connection.execute<ResultSetHeader>(
-        "INSERT INTO quizzes (class_id, title, kind, published_at, created_by) VALUES (?, ?, 'PRACTICE', ?, ?)",
-        [classId, input.title, input.publishedAt, createdBy],
+        "INSERT INTO quizzes (class_id, lesson_id, title, kind, published_at, created_by) VALUES (?, ?, ?, 'PRACTICE', ?, ?)",
+        [classId, lessonId, input.title, input.publishedAt, createdBy],
       );
       const quizId = String(result.insertId);
       for (const [index, question] of input.questions.entries()) {
@@ -288,9 +292,10 @@ export class MysqlPracticeRepository implements PracticeRepository {
     const [[quizRows], [bestRows]] = await Promise.all([
       // `now` sale de Node, igual que en el material (misma zona horaria).
       database.execute<RowDataPacket[]>(
-        `SELECT q.id, q.class_id, q.title, (SELECT COUNT(*) FROM questions qu WHERE qu.quiz_id = q.id) AS question_count
+        `SELECT DISTINCT q.id, q.lesson_id, l.name AS lesson_name, q.title, (SELECT COUNT(*) FROM questions qu WHERE qu.quiz_id = q.id) AS question_count
          FROM quizzes q
-         JOIN classes c ON c.id = q.class_id
+         JOIN lessons l ON l.id = q.lesson_id
+         JOIN classes c ON c.lesson_id = q.lesson_id
          JOIN group_members gm ON gm.group_id = c.group_id
          WHERE gm.user_id = ? AND q.kind = 'PRACTICE' AND q.published_at IS NOT NULL AND q.published_at <= ?
          ORDER BY q.id ASC`,
@@ -310,7 +315,8 @@ export class MysqlPracticeRepository implements PracticeRepository {
       const best = bestRows.find((item) => String(item.quiz_id) === String(row.id));
       return {
         quizId: String(row.id),
-        classId: String(row.class_id),
+        lessonId: String(row.lesson_id),
+        lessonName: String(row.lesson_name),
         title: row.title,
         questionCount: Number(row.question_count),
         attempts: best ? Number(best.attempts) : 0,
@@ -319,7 +325,16 @@ export class MysqlPracticeRepository implements PracticeRepository {
     });
   }
 
-  async ensureSession(quiz: PracticeQuiz, groupId: string): Promise<string> {
+  async isLessonVisibleTo(lessonId: string, userId: string): Promise<boolean> {
+    const [rows] = await getDatabasePool().execute<RowDataPacket[]>(
+      `SELECT 1 FROM classes c JOIN group_members gm ON gm.group_id = c.group_id
+       WHERE c.lesson_id = ? AND gm.user_id = ? LIMIT 1`,
+      [lessonId, userId],
+    );
+    return rows.length > 0;
+  }
+
+  async ensureSession(quiz: PracticeQuiz): Promise<string> {
     const find = async () => {
       const [rows] = await getDatabasePool().execute<RowDataPacket[]>(
         "SELECT id FROM quiz_sessions WHERE quiz_id = ? AND mode = 'PRACTICE' LIMIT 1",
@@ -333,9 +348,10 @@ export class MysqlPracticeRepository implements PracticeRepository {
 
     try {
       const [result] = await getDatabasePool().execute<ResultSetHeader>(
+        // De todos los grupos de la sesión: sin grupo ni clase concretos.
         `INSERT INTO quiz_sessions (quiz_id, host_id, group_id, class_id, game_code, mode, status)
-         VALUES (?, ?, ?, ?, ?, 'PRACTICE', 'IN_PROGRESS')`,
-        [quiz.id, quiz.createdBy, groupId, quiz.classId, `PRAC-${quiz.id}`],
+         VALUES (?, ?, NULL, NULL, ?, 'PRACTICE', 'IN_PROGRESS')`,
+        [quiz.id, quiz.createdBy, `PRAC-${quiz.id}`],
       );
       return String(result.insertId);
     } catch (error: unknown) {

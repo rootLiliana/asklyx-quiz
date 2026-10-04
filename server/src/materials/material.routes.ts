@@ -17,6 +17,14 @@ export function createMaterialRouter(guards: AuthGuards, materials: MaterialServ
     }
   });
 
+  router.get("/classes/:classId/materials/views", guards.requireHost, async (req, res, next) => {
+    try {
+      res.json(await materials.viewReport(getPathParam(req, "classId")));
+    } catch (error: unknown) {
+      handleError(error, res, next);
+    }
+  });
+
   router.post("/classes/:classId/materials", guards.requireHost, async (req, res, next) => {
     try {
       const material = await materials.create(getPathParam(req, "classId"), req.body, getAuthUser(req)?.id ?? "");

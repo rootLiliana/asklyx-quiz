@@ -15,6 +15,9 @@ export interface ClassSummary {
   startTime: string | null;
   endTime: string | null;
   status: string;
+  // Sesión: las clases de CDD1 y CDD2 con el mismo módulo y nombre la
+  // comparten (y con ella su material y su práctica).
+  lessonId?: string | null;
 }
 
 // GET /modules

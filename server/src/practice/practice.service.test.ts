@@ -3,7 +3,6 @@ import test from "node:test";
 
 import type { ClassRepository } from "../classes/class.repository.js";
 import type { ClassItem } from "../classes/class.types.js";
-import type { GroupRepository } from "../groups/group.repository.js";
 import { PracticeAlreadyAnsweredError, type PracticeRepository } from "./practice.repository.js";
 import {
   PracticeAttemptFinishedError,
@@ -17,11 +16,11 @@ import type { PracticeAttempt, PracticeQuiz, PracticeQuizInput } from "./practic
 const NOW = new Date("2026-10-04T12:00:00Z");
 const classCdd1: ClassItem = {
   id: "1", moduleId: "1", groupId: "10", name: "Sesión 3", description: null,
-  classDate: "2026-10-05", startTime: null, endTime: null, status: "SCHEDULED",
+  classDate: "2026-10-05", startTime: null, endTime: null, status: "SCHEDULED", lessonId: "L3",
 };
-const classes = { findById: async (id: string) => (id === "1" ? classCdd1 : null) } as unknown as ClassRepository;
-// ana (25) y sofi (27) están en el grupo 10; luis (26) no.
-const groups = { hasMember: async (groupId: string, userId: string) => groupId === "10" && ["25", "27"].includes(userId) } as unknown as GroupRepository;
+// Misma sesión en el otro grupo.
+const classCdd2: ClassItem = { ...classCdd1, id: "2", groupId: "11", classDate: "2026-10-06" };
+const classes = { findById: async (id: string) => [classCdd1, classCdd2].find((item) => item.id === id) ?? null } as unknown as ClassRepository;
 
 class FakePractice implements PracticeRepository {
   quizzes = new Map<string, PracticeQuiz>();
@@ -29,12 +28,15 @@ class FakePractice implements PracticeRepository {
   lastUpdate: PracticeQuizInput | null = null;
   private nextId = 100;
 
-  async listForClass() { return []; }
+  async listForLesson(lessonId: string) {
+    return [...this.quizzes.values()].filter((quiz) => quiz.lessonId === lessonId)
+      .map((quiz) => ({ id: quiz.id, title: quiz.title, publishedAt: quiz.publishedAt, questionCount: quiz.questions.length, students: 0, attempts: 0, averageBestPercentage: null }));
+  }
   async findById(id: string) { return this.quizzes.get(id) ?? null; }
-  async create(classId: string, input: PracticeQuizInput, createdBy: string) {
+  async create(classId: string, lessonId: string, input: PracticeQuizInput, createdBy: string) {
     const id = String(this.nextId++);
     this.quizzes.set(id, {
-      id, classId, title: input.title, publishedAt: input.publishedAt?.toISOString() ?? null, createdBy,
+      id, classId, lessonId, title: input.title, publishedAt: input.publishedAt?.toISOString() ?? null, createdBy,
       questions: input.questions.map((question) => ({
         ...question,
         id: String(this.nextId++),
@@ -48,6 +50,8 @@ class FakePractice implements PracticeRepository {
   async studentStats() { return []; }
   async listForStudent() { return []; }
   async ensureSession() { return "900"; }
+  // ana (25) y sofi (27) en CDD1, bere (28) en CDD2: tienen la sesión L3. luis (26), no.
+  async isLessonVisibleTo(lessonId: string, userId: string) { return lessonId === "L3" && ["25", "27", "28"].includes(userId); }
   async createAttempt(sessionId: string, studentId: string, totalQuestions: number) {
     const id = String(this.nextId++);
     const quizId = [...this.quizzes.keys()][0] ?? "";
@@ -80,7 +84,7 @@ const input = (publishedAt: string | null) => ({
 
 function build() {
   const repository = new FakePractice();
-  return { repository, service: new PracticeService(repository, classes, groups, () => NOW) };
+  return { repository, service: new PracticeService(repository, classes, () => NOW) };
 }
 
 test("validates every question type", () => {
@@ -170,4 +174,13 @@ test("on update, only question/option ids that belong to that quiz are kept (oth
   assert.equal(sent.questions[0]!.options[0]!.id, mc!.options[0]!.id);
   assert.equal(sent.questions[0]!.options[1]!.id, null);
   assert.equal(sent.questions[1]!.id, null);
+});
+
+test("practice is per session: created from CDD1's class, CDD2 lists it and its students can play it", async () => {
+  const { service } = build();
+  const quiz = await service.create(classCdd1.id, input("2026-10-01T00:00:00Z"), "1");
+
+  assert.deepEqual((await service.listForClass(classCdd2.id)).map((item) => item.id), [quiz.id]);
+  assert.equal((await service.startAttempt(quiz.id, "28")).quiz.id, quiz.id);
+  await assert.rejects(service.startAttempt(quiz.id, "26"), PracticeNotFoundError);
 });

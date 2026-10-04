@@ -1,7 +1,6 @@
 import type { ClassRepository } from "../classes/class.repository.js";
-import type { GroupRepository } from "../groups/group.repository.js";
 import type { MaterialRepository } from "./material.repository.js";
-import { CODE_LANGUAGES, type CodeLanguage, type Material, type MaterialBlock, type MaterialFields, type StudentClassMaterials } from "./material.types.js";
+import { CODE_LANGUAGES, type CodeLanguage, type Material, type MaterialBlock, type MaterialFields, type MaterialViewReport, type StudentClassMaterials } from "./material.types.js";
 
 export class MaterialInputError extends Error {}
 export class MaterialNotFoundError extends Error {}
@@ -89,27 +88,31 @@ export class MaterialService {
   constructor(
     private readonly materials: MaterialRepository,
     private readonly classes: ClassRepository,
-    private readonly groups: GroupRepository,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
   // --- Hosts y admin ---
 
-  async listForClass(classId: string): Promise<Material[]> {
-    const validClassId = validateId(classId, "classId");
-    if (!(await this.classes.findById(validClassId))) {
+  // El material es de la sesión de esa clase (compartida entre grupos).
+  private async lessonOf(classId: string): Promise<string> {
+    const classItem = await this.classes.findById(validateId(classId, "classId"));
+    if (!classItem?.lessonId) {
       throw new MaterialClassNotFoundError("Class not found");
     }
-    return this.materials.findByClass(validClassId);
+    return classItem.lessonId;
+  }
+
+  async listForClass(classId: string): Promise<Material[]> {
+    return this.materials.findByLesson(await this.lessonOf(classId));
   }
 
   async create(classId: string, input: unknown, createdBy: string): Promise<Material> {
-    const validClassId = validateId(classId, "classId");
     const fields = validateMaterialInput(input);
-    if (!(await this.classes.findById(validClassId))) {
-      throw new MaterialClassNotFoundError("Class not found");
-    }
-    return this.materials.create(validClassId, fields, createdBy);
+    return this.materials.create(await this.lessonOf(classId), fields, createdBy);
+  }
+
+  async viewReport(classId: string): Promise<MaterialViewReport> {
+    return this.materials.viewReport(await this.lessonOf(classId));
   }
 
   async update(id: string, input: unknown): Promise<Material> {
@@ -134,13 +137,19 @@ export class MaterialService {
     const material = await this.materials.findById(validateId(id, "id"));
     const isPublished = material?.publishedAt !== null && material?.publishedAt !== undefined
       && new Date(material.publishedAt).getTime() <= this.now().getTime();
-    const classItem = material ? await this.classes.findById(material.classId) : null;
-    const isMember = classItem ? await this.groups.hasMember(classItem.groupId, userId) : false;
+    const isMember = material ? await this.materials.isLessonVisibleTo(material.lessonId, userId) : false;
 
     // Mismo error si no existe, no está publicado o no es de su grupo: no
     // revela que hay material escondido.
     if (!material || !isPublished || !isMember) {
       throw new MaterialNotFoundError("Material not found");
+    }
+
+    // Si no se puede anotar, igual se muestra el material.
+    try {
+      await this.materials.recordView(material.id, userId);
+    } catch (error: unknown) {
+      console.error("No se pudo anotar la apertura del material", error);
     }
     return material;
   }

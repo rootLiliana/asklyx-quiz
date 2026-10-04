@@ -1,5 +1,4 @@
 import type { ClassRepository } from "../classes/class.repository.js";
-import type { GroupRepository } from "../groups/group.repository.js";
 import { gradeAnswer } from "./practice.grading.js";
 import type { PracticeRepository } from "./practice.repository.js";
 import {
@@ -150,16 +149,20 @@ export class PracticeService {
   constructor(
     private readonly practice: PracticeRepository,
     private readonly classes: ClassRepository,
-    private readonly groups: GroupRepository,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
   // --- Hosts y admin ---
 
+  // La práctica es de la sesión de esa clase (compartida entre grupos).
+  private async lessonOf(classId: string): Promise<{ classId: string; lessonId: string }> {
+    const classItem = await this.classes.findById(validateId(classId, "classId"));
+    if (!classItem?.lessonId) throw new PracticeNotFoundError("Class not found");
+    return { classId: classItem.id, lessonId: classItem.lessonId };
+  }
+
   async listForClass(classId: string): Promise<PracticeQuizSummary[]> {
-    const validClassId = validateId(classId, "classId");
-    if (!(await this.classes.findById(validClassId))) throw new PracticeNotFoundError("Class not found");
-    return this.practice.listForClass(validClassId);
+    return this.practice.listForLesson((await this.lessonOf(classId)).lessonId);
   }
 
   async getForHost(id: string): Promise<PracticeQuiz> {
@@ -169,10 +172,9 @@ export class PracticeService {
   }
 
   async create(classId: string, input: unknown, createdBy: string): Promise<PracticeQuiz> {
-    const validClassId = validateId(classId, "classId");
     const fields = validatePracticeInput(input);
-    if (!(await this.classes.findById(validClassId))) throw new PracticeNotFoundError("Class not found");
-    const id = await this.practice.create(validClassId, fields, createdBy);
+    const lesson = await this.lessonOf(classId);
+    const id = await this.practice.create(lesson.classId, lesson.lessonId, fields, createdBy);
     return this.getForHost(id);
   }
 
@@ -206,26 +208,25 @@ export class PracticeService {
     return this.practice.listForStudent(userId, this.now());
   }
 
-  // Publicado y de una clase de su grupo; si no, "no encontrado" (no revela
-  // que existe).
-  private async accessibleQuiz(quizId: string, userId: string): Promise<{ quiz: PracticeQuiz; groupId: string }> {
+  // Publicado y de una sesión que tiene su grupo; si no, "no encontrado" (no
+  // revela que existe).
+  private async accessibleQuiz(quizId: string, userId: string): Promise<PracticeQuiz> {
     const quiz = await this.practice.findById(validateId(quizId, "quizId"));
     const isPublished = quiz?.publishedAt !== null && quiz?.publishedAt !== undefined
       && new Date(quiz.publishedAt).getTime() <= this.now().getTime();
-    const classItem = quiz ? await this.classes.findById(quiz.classId) : null;
-    const isMember = classItem ? await this.groups.hasMember(classItem.groupId, userId) : false;
+    const isMember = quiz?.lessonId ? await this.practice.isLessonVisibleTo(quiz.lessonId, userId) : false;
 
-    if (!quiz || !isPublished || !classItem || !isMember) throw new PracticeNotFoundError("Practice quiz not found");
-    return { quiz, groupId: classItem.groupId };
+    if (!quiz || !isPublished || !isMember) throw new PracticeNotFoundError("Practice quiz not found");
+    return quiz;
   }
 
   async getForStudent(quizId: string, userId: string): Promise<PublicPracticeQuiz> {
-    return toPublicQuiz((await this.accessibleQuiz(quizId, userId)).quiz);
+    return toPublicQuiz(await this.accessibleQuiz(quizId, userId));
   }
 
   async startAttempt(quizId: string, userId: string): Promise<{ attemptId: string; quiz: PublicPracticeQuiz }> {
-    const { quiz, groupId } = await this.accessibleQuiz(quizId, userId);
-    const sessionId = await this.practice.ensureSession(quiz, groupId);
+    const quiz = await this.accessibleQuiz(quizId, userId);
+    const sessionId = await this.practice.ensureSession(quiz);
     const attemptId = await this.practice.createAttempt(sessionId, userId, quiz.questions.length);
     return { attemptId, quiz: toPublicQuiz(quiz) };
   }
