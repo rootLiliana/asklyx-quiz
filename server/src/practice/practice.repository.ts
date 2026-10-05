@@ -364,13 +364,24 @@ export class MysqlPracticeRepository implements PracticeRepository {
     }
   }
 
+  // Cada intento lleva el siguiente número (UNIQUE session_id + student_id +
+  // attempt_number). Si dos intentos empiezan al mismo tiempo (doble clic),
+  // uno choca y se reintenta con el número que sigue.
   async createAttempt(sessionId: string, studentId: string, totalQuestions: number): Promise<string> {
-    const [result] = await getDatabasePool().execute<ResultSetHeader>(
-      `INSERT INTO quiz_attempts (session_id, student_id, score, correct_answers, total_questions, started_at)
-       VALUES (?, ?, 0, 0, ?, ?)`,
-      [sessionId, studentId, totalQuestions, new Date()],
-    );
-    return String(result.insertId);
+    for (let retry = 0; ; retry++) {
+      try {
+        const [result] = await getDatabasePool().execute<ResultSetHeader>(
+          `INSERT INTO quiz_attempts (session_id, student_id, attempt_number, score, correct_answers, total_questions, started_at)
+           SELECT ?, ?, COALESCE(MAX(attempt_number), 0) + 1, 0, 0, ?, ?
+           FROM quiz_attempts WHERE session_id = ? AND student_id = ?`,
+          [sessionId, studentId, totalQuestions, new Date(), sessionId, studentId],
+        );
+        return String(result.insertId);
+      } catch (error: unknown) {
+        if (retry < 3 && isDatabaseError(error, "ER_DUP_ENTRY")) continue;
+        throw error;
+      }
+    }
   }
 
   async findAttempt(id: string): Promise<PracticeAttempt | null> {
