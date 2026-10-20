@@ -61,6 +61,14 @@
   }
 }
 
+/* Fila deslizable sin barra visible (menú del Control Center en celular). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -320,7 +320,7 @@ export default function Host() {
               </Button>
             </div>
           </div>
-          <nav className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1" aria-label="Secciones del panel">
+          <nav className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,black_85%,transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:[mask-image:none]" aria-label="Secciones del panel">
             {SECTIONS.flatMap((group) => group.tabs).map((item) => tabButton(item, true))}
           </nav>
         </div>
