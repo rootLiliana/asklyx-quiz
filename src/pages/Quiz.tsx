@@ -1,28 +1,24 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import Confetti from "react-confetti";
 import { API } from "../config/api";
 import { studentFetch } from "../lib/studentSession";
+import { Button, Card, LoadingDots, Owl, Screen, Spinner, TimerRing } from "../components/ui";
 import type { QuestionResponse, StudentQuestion } from "../types/QuestionResponse";
 import type { SubmitAnswerResponse } from "../types/SubmitAnswerResponse";
 
-type Screen = "loading" | "waiting" | "question" | "finished" | "missing";
+type View = "loading" | "waiting" | "question" | "finished" | "missing";
 
 const POLL_MS = 2000;
-
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-dvh bg-gradient-to-br from-purple-900 via-indigo-900 to-black flex items-center justify-center p-4 sm:p-6">
-      {children}
-    </div>
-  );
-}
+const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 export default function Quiz() {
   const navigate = useNavigate();
   const code = localStorage.getItem("gameCode");
+  const nickname = localStorage.getItem("studentNickname");
 
-  const [screen, setScreen] = useState<Screen>(code ? "loading" : "missing");
+  const [screen, setScreen] = useState<View>(code ? "loading" : "missing");
   const [question, setQuestion] = useState<StudentQuestion | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [result, setResult] = useState<SubmitAnswerResponse | null>(null);
@@ -117,107 +113,150 @@ export default function Quiz() {
 
   if (screen === "missing") {
     return (
-      <Shell>
-        <div className="text-center text-white max-w-md">
-          <p className="text-6xl mb-4">🔌</p>
-          <h1 className="text-2xl font-bold mb-3">Este juego ya no está disponible</h1>
-          <p className="text-white/70 mb-6">Pide a tu profe el código del juego y vuelve a entrar.</p>
-          <button onClick={() => navigate("/join")} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-6 py-3 font-bold">
+      <Screen center>
+        <Card initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid max-w-md justify-items-center gap-4 p-8 text-center">
+          <Owl className="size-20" blink={false} />
+          <h1 className="m-0 font-display text-3xl font-semibold">Este juego ya no está disponible</h1>
+          <p className="m-0 text-slate-300">Pide a tu profe el código del juego y vuelve a entrar.</p>
+          <Button onClick={() => navigate("/join")} size="lg">
             Volver a entrar
-          </button>
-        </div>
-      </Shell>
+          </Button>
+        </Card>
+      </Screen>
     );
   }
 
   if (screen !== "question" || !question) {
     return (
-      <Shell>
-        <motion.h1
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="text-white text-3xl sm:text-4xl font-bold text-center"
-        >
-          {screen === "waiting" ? "🎮 Esperando al experto..." : "⏳ Cargando..."}
-        </motion.h1>
-      </Shell>
+      <Screen center>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid justify-items-center gap-5 text-center">
+          <Owl className="size-28 animate-float" />
+          {screen === "waiting" ? (
+            <>
+              <h1 className="m-0 font-display text-4xl font-semibold sm:text-5xl">
+                {nickname ? `¡Lista, ${nickname}!` : "¡Ya estás dentro!"}
+              </h1>
+              <p className="m-0 flex items-center gap-3 text-lg text-slate-200">
+                Esperando a que la host empiece <LoadingDots />
+              </p>
+              <p className="m-0 max-w-sm text-sm text-slate-400">
+                Contesta rápido: entre más tiempo te quede, más puntos ganas.
+              </p>
+            </>
+          ) : (
+            <p className="m-0 flex items-center gap-3 text-lg text-slate-200">
+              <Spinner className="size-5" /> Cargando…
+            </p>
+          )}
+        </motion.div>
+      </Screen>
     );
   }
 
   const timeIsUp = timeLeft <= 0 && !result;
   const locked = Boolean(result) || sending || timeIsUp;
-  const headline = result
-    ? result.alreadyAnswered ? "⚠️ Ya habías respondido esta pregunta."
-      : result.timeUp ? "⌛ Se acabó el tiempo"
-        : result.correct ? "✅ Correcto" : "❌ Incorrecto"
-    : timeIsUp ? "⌛ Tiempo agotado" : "";
 
   const optionClass = (index: number) => {
-    if (result && index === result.correctAnswer) return "from-green-500 to-emerald-600 ring-4 ring-green-300";
-    if (result && index === chosen) return "from-red-500 to-rose-600 opacity-90";
-    if (locked) return "from-fuchsia-500/60 to-purple-600/60";
-    return "from-fuchsia-500 to-purple-600";
+    if (result && index === result.correctAnswer) return "from-green-500 to-emerald-600 ring-4 ring-green-300 shadow-glow-green";
+    if (result && index === chosen) return "from-red-500 to-rose-600";
+    if (index === chosen && sending) return "from-fuchsia-400 to-purple-500 ring-4 ring-fuchsia-200";
+    if (locked) return "from-fuchsia-500/40 to-purple-600/40 text-white/70";
+    return "from-fuchsia-500 to-purple-600 shadow-glow hover:from-fuchsia-400 hover:to-purple-500";
   };
 
+  const verdict = result
+    ? result.alreadyAnswered
+      ? { tone: "info", title: "Ya habías respondido", text: "Solo cuenta tu primera respuesta." }
+      : result.timeUp
+        ? { tone: "bad", title: "Se acabó el tiempo", text: "Esta respuesta llegó tarde y vale 0 puntos." }
+        : result.correct
+          ? { tone: "good", title: "¡Correcto!", text: `Llevas ${result.score} puntos.` }
+          : { tone: "bad", title: "Esta vez no", text: `Llevas ${result.score} puntos. ¡La siguiente es tuya!` }
+    : timeIsUp
+      ? { tone: "bad", title: "Tiempo agotado", text: "Espera la siguiente pregunta." }
+      : null;
+
+  const celebrate = Boolean(result?.correct && !result.alreadyAnswered);
+
   return (
-    <Shell>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white/10 backdrop-blur-xl rounded-3xl p-5 sm:p-8 shadow-2xl w-full max-w-4xl"
-      >
-        <div className="flex justify-between items-center mb-4 sm:mb-6">
-          <h2 className="text-white text-lg sm:text-xl font-bold">Pregunta</h2>
-          <p className="text-fuchsia-300 font-bold text-lg sm:text-xl">⚡ {result ? result.score : timeLeft * 100} pts</p>
+    <Screen center>
+      {celebrate && (
+        <Confetti
+          recycle={false}
+          numberOfPieces={160}
+          gravity={0.25}
+          colors={["#D946EF", "#F0ABFC", "#FACC15", "#FCD34D", "#22C55E"]}
+          className="pointer-events-none !fixed inset-0"
+        />
+      )}
+
+      <motion.main key={question.id} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="grid w-full max-w-4xl gap-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Owl className="size-9" blink={false} />
+            <span className="font-display text-lg font-semibold text-slate-200">{nickname ?? "Pregunta"}</span>
+          </div>
+          <span className="rounded-full border border-yellow-400/40 bg-yellow-400/10 px-4 py-1.5 text-sm font-extrabold text-yellow-300 tabular-nums">
+            {result ? `${result.score} pts` : timeIsUp ? "0 pts" : `vale ${timeLeft * 100} pts`}
+          </span>
         </div>
 
-        <motion.div
-          animate={timeLeft <= 3 && !result ? { scale: [1, 1.1, 1] } : { scale: 1 }}
-          transition={{ repeat: timeLeft <= 3 && !result ? Infinity : 0, duration: 0.8 }}
-          className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-fuchsia-400 flex items-center justify-center text-white text-3xl sm:text-4xl font-bold mx-auto mb-6 sm:mb-8"
-        >
-          {timeLeft}
-        </motion.div>
+        <Card className="grid justify-items-center gap-5 p-5 sm:p-8">
+          <TimerRing seconds={timeLeft} total={question.durationSeconds} />
+          <h1 className="m-0 text-balance text-center font-display text-2xl font-semibold leading-tight break-words sm:text-4xl">
+            {question.text}
+          </h1>
+        </Card>
 
-        <h1 className="text-white text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-10 break-words">
-          {question.text}
-        </h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {question.options.map((option, index) => (
             <motion.button
               key={index}
-              whileTap={locked ? undefined : { scale: 0.96 }}
+              type="button"
+              initial={{ opacity: 0, y: 12 }}
+              animate={result && index === chosen && !result.correct ? { opacity: 1, y: 0, x: [0, -6, 6, -4, 0] } : { opacity: 1, y: 0 }}
+              transition={{ delay: result ? 0 : 0.05 * index }}
+              whileTap={locked ? undefined : { scale: 0.97 }}
               disabled={locked}
               onClick={() => void submitAnswer(index)}
-              className={`p-4 sm:p-6 rounded-2xl bg-gradient-to-r text-white text-lg sm:text-xl font-bold shadow-xl break-words transition disabled:cursor-default ${optionClass(index)}`}
+              className={`flex min-h-20 items-center gap-4 rounded-2xl bg-gradient-to-r p-4 text-left text-lg font-bold break-words transition disabled:cursor-default sm:p-5 sm:text-xl ${optionClass(index)}`}
             >
-              {option}
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/20 font-display text-xl">
+                {result && index === result.correctAnswer ? "✓" : LETTERS[index] ?? index + 1}
+              </span>
+              <span className="min-w-0">{option}</span>
             </motion.button>
           ))}
         </div>
 
-        {(headline || notice) && (
-          <div className="mt-6 sm:mt-8 text-center">
-            {headline && <h2 className="text-2xl sm:text-3xl font-bold text-white">{headline}</h2>}
-            {notice && <p className="mt-2 text-amber-300">{notice}</p>}
-          </div>
-        )}
+        {notice && <p className="m-0 text-center font-semibold text-amber-300">{notice}</p>}
 
-        {result && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-6 sm:mt-8 p-5 sm:p-6 rounded-2xl bg-white/10 border border-fuchsia-400/30 text-white"
-          >
-            <h3 className={`text-xl sm:text-2xl font-bold mb-3 ${result.correct ? "text-green-400" : "text-red-400"}`}>
-              {result.correct ? "🎉 ¡Excelente!" : "📚 Aprendamos"}
-            </h3>
-            <p className="text-xl sm:text-2xl font-bold text-green-300 mb-4 break-words">{question.options[result.correctAnswer]}</p>
-            {result.explanation && <p className="text-base sm:text-lg leading-relaxed">💡 {result.explanation}</p>}
-          </motion.div>
-        )}
-      </motion.div>
-    </Shell>
+        <AnimatePresence>
+          {verdict && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+            >
+              <Card tone={verdict.tone === "good" ? "good" : verdict.tone === "bad" ? "bad" : "soft"} className="grid gap-3 p-5 sm:p-6">
+                <div>
+                  <h2 className={`m-0 font-display text-3xl font-semibold ${verdict.tone === "good" ? "text-green-300" : verdict.tone === "bad" ? "text-red-300" : ""}`}>
+                    {verdict.title}
+                  </h2>
+                  <p className="m-0 mt-1 text-slate-200">{verdict.text}</p>
+                </div>
+                {result && (
+                  <div className="grid gap-1 border-t border-white/10 pt-3">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Respuesta correcta</span>
+                    <p className="m-0 text-xl font-bold text-green-300 break-words">{question.options[result.correctAnswer]}</p>
+                    {result.explanation && <p className="m-0 leading-relaxed text-slate-200">{result.explanation}</p>}
+                  </div>
+                )}
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.main>
+    </Screen>
   );
 }

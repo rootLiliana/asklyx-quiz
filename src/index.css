@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+/*
+  Tema de Lilihoot.
+  Paleta: degradado purple-900 → indigo-900 → black, marca fuchsia-500 → purple-600,
+  correcto green-500 → emerald-600, incorrecto red-500 → rose-600, premios yellow-400 → amber-500.
+  Los colores salen directo de Tailwind; aquí solo van fuentes, sombras y animaciones.
+*/
+@theme {
+  --font-sans: "Nunito Variable", "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fredoka Variable", "Fredoka", "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  --color-code: #1e1e2e;
+
+  --shadow-glow: 0 10px 30px -8px rgb(217 70 239 / 0.55);
+  --shadow-glow-gold: 0 10px 30px -8px rgb(250 204 21 / 0.55);
+  --shadow-glow-green: 0 10px 30px -8px rgb(34 197 94 / 0.6);
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-blink: blink 1.4s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 1; }
+  }
+}
+
+@layer base {
+  html {
+    background-color: var(--color-slate-950);
+    color-scheme: dark;
+  }
+  body {
+    font-family: var(--font-sans);
+    color: white;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: rgb(217 70 239 / 0.45);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-yellow-400);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
