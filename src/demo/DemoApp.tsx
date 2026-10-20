@@ -24,7 +24,7 @@ function DemoPanel() {
   const [phase, index] = snapshot.split(":") as [DemoPhase, string];
   const [open, setOpen] = useState(true);
 
-  // Al terminar, el Quiz manda al podio (aún con el diseño anterior).
+  // Al terminar, el Quiz manda al podio.
   useEffect(() => {
     if (location.pathname === "/quiz" && phase === "finished") navigate("/podium");
   }, [location.pathname, phase, navigate]);
@@ -77,6 +77,7 @@ function DemoPanel() {
           <button type="button" className={chip(location.pathname === "/")} onClick={() => navigate("/")}>Inicio</button>
           <button type="button" className={chip(location.pathname === "/quiz")} onClick={() => navigate("/quiz")}>Quiz de la alumna</button>
           <button type="button" className={chip(location.pathname === "/host")} onClick={goHost}>Control Center</button>
+          <button type="button" className={chip(location.pathname === "/podium")} onClick={() => navigate(`/podium?code=ANA-4821&v=${Date.now()}`)}>Podio</button>
         </div>
       </div>
 
@@ -97,7 +98,7 @@ function DemoPanel() {
 
       <p className="m-0 text-xs leading-relaxed text-slate-400">
         {location.pathname === "/host"
-          ? "Datos inventados. Puedes navegar y abrir detalles; los cambios no se guardan. La vista del juego en vivo es la siguiente fase."
+          ? "Datos inventados; los cambios no se guardan. Para probar el juego en vivo: en Sesión elige un quiz y créalo. Las alumnas de ejemplo entran y contestan solas."
           : "Toca una opción para contestar. Las pantallas que no están en este panel todavía tienen el diseño anterior."}
       </p>
     </aside>

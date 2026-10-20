@@ -5,6 +5,10 @@ import {
   CLASSES, DEMO_HOST, GROUPS, MEMBERSHIPS, MODULES, QUIZZES, USERS,
   attendanceFor, resultDetail, resultSessions, studentHistory,
 } from "./hostFixtures";
+import {
+  simCreate, simGet, simIcebreakerClose, simIcebreakerGet, simIcebreakerStart,
+  simLeaderboard, simNext, simStart, simStats,
+} from "./liveSim";
 
 export type DemoPhase = "waiting" | "question" | "finished";
 
@@ -121,6 +125,8 @@ function handle(path: string, init?: RequestInit): Response {
   }
 
   if (/^\/games\/[^/]+\/leaderboard$/.test(path)) {
+    const live = simLeaderboard();
+    if (live) return json(live);
     return json([
       { id: "1", name: "Sofi", score: state.score || 2600 },
       { id: "2", name: "Vale", score: 2300 },
@@ -162,6 +168,21 @@ function handleHost(path: string, init?: RequestInit): Response | null {
   if ((match = pathname?.match(/^\/host\/results\/students\/([^/]+)$/) ?? null)) return json(studentHistory(match[1] ?? ""));
   if (pathname?.match(/^\/classes\/[^/]+\/(materials|practice)(\/views)?$/)) {
     return json(pathname.endsWith("/views") ? { students: [], views: [] } : []);
+  }
+  // Juego en vivo simulado (vista de la host).
+  const body = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {};
+  const orNotFound = (value: unknown) => (value ? json(value) : json({ message: "Game not found" }, 404));
+  if (pathname === "/games" && method === "POST") return json(simCreate(typeof body.durationSeconds === "number" ? body.durationSeconds : 20));
+  if ((match = pathname?.match(/^\/games\/[^/]+(\/start|\/next|\/stats|\/icebreaker(?:\/close)?)?$/) ?? null)) {
+    switch (`${method} ${match[1] ?? ""}`) {
+      case "GET ": return orNotFound(simGet());
+      case "POST /start": return orNotFound(simStart());
+      case "POST /next": return orNotFound(simNext());
+      case "GET /stats": return orNotFound(simStats());
+      case "POST /icebreaker": return orNotFound(simIcebreakerStart(typeof body.question === "string" ? body.question : ""));
+      case "GET /icebreaker": return orNotFound(simIcebreakerGet());
+      case "PUT /icebreaker/close": return orNotFound({ message: "ok", icebreaker: simIcebreakerClose() });
+    }
   }
   if (method !== "GET") return json({ message: "En la vista previa no se guardan cambios." }, 400);
   return null;

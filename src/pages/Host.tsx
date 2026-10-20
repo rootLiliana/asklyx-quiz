@@ -241,7 +241,9 @@ export default function Host() {
   }
 
   const isAdmin = hostUser.role === "ADMIN";
-  const meta = TAB_META[tab];
+  const meta = tab === "session" && liveGame
+    ? { ...TAB_META.session, description: "Juego en curso. Proyecta esta pantalla para que el grupo la vea." }
+    : TAB_META[tab];
   const section = SECTIONS.find((item) => item.tabs.includes(tab));
   const roleChip = (
     <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${isAdmin ? "bg-yellow-400/20 text-yellow-200" : "bg-fuchsia-500/25 text-fuchsia-200"}`}>

@@ -4,6 +4,7 @@ import Confetti from "react-confetti";
 import { AnimatePresence, motion } from "framer-motion";
 import { API } from "../config/api";
 import type { Player } from "../types/Player";
+import { Button, Owl, Screen } from "../components/ui";
 
 // Línea de tiempo de la revelación (ms desde que llega el leaderboard).
 //   calculating -> las nubes tapan todo
@@ -36,7 +37,6 @@ interface PlaceStyle {
   revealStep: Step;
   medal: string;
   label: string;
-  announcer: string;
   burst: string[];
   pedestal: string;
   pedestalHeight: string;
@@ -49,7 +49,6 @@ const PLACES: Record<1 | 2 | 3, PlaceStyle> = {
     revealStep: "first",
     medal: "🥇",
     label: "¡PRIMER LUGAR!",
-    announcer: "🥳",
     burst: ["🏆", "👑", "🎉", "⭐", "✨", "🥇", "💛", "🎊"],
     pedestal: "from-yellow-300 via-amber-400 to-amber-600 shadow-[0_0_60px_rgba(251,191,36,0.55)]",
     pedestalHeight: "h-36 sm:h-44 md:h-56",
@@ -60,7 +59,6 @@ const PLACES: Record<1 | 2 | 3, PlaceStyle> = {
     revealStep: "second",
     medal: "🥈",
     label: "¡Segundo lugar!",
-    announcer: "😎",
     burst: ["🥈", "✨", "🎉", "💫", "🙌"],
     pedestal: "from-slate-200 via-slate-300 to-slate-500",
     pedestalHeight: "h-24 sm:h-32 md:h-40",
@@ -71,7 +69,6 @@ const PLACES: Record<1 | 2 | 3, PlaceStyle> = {
     revealStep: "third",
     medal: "🥉",
     label: "¡Tercer lugar!",
-    announcer: "🤩",
     burst: ["🥉", "🎉", "✨", "👏", "🔥"],
     pedestal: "from-orange-300 via-orange-400 to-orange-700",
     pedestalHeight: "h-16 sm:h-24 md:h-28",
@@ -177,15 +174,15 @@ function PodiumColumn({ player, style, step }: { player: Player | undefined; sty
             >
               <div className="relative mb-1 max-w-[7.5rem] sm:max-w-[10rem] md:max-w-[13rem] rounded-2xl bg-white px-2 py-1 sm:px-3 sm:py-2 text-center text-[10px] sm:text-xs md:text-sm font-bold leading-tight text-purple-900 shadow-lg">
                 {style.label}
-                <span className="block break-all pb-0.5 font-black text-fuchsia-600">¡{player.name}!</span>
+                <span className="block break-all pb-0.5 font-display font-semibold text-fuchsia-600">¡{player.name}!</span>
                 <span className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white" />
               </div>
               <motion.span
-                className="text-3xl sm:text-4xl md:text-5xl"
-                animate={{ rotate: [0, -12, 12, -8, 0], y: [0, -6, 0] }}
+                className="block"
+                animate={{ rotate: [0, -10, 10, -6, 0], y: [0, -6, 0] }}
                 transition={{ repeat: Infinity, duration: 1.6, repeatDelay: 0.6 }}
               >
-                {style.announcer}
+                <Owl className="size-10 sm:size-12 md:size-14" />
               </motion.span>
             </motion.div>
           )}
@@ -212,7 +209,7 @@ function PodiumColumn({ player, style, step }: { player: Player | undefined; sty
                 </motion.span>
               )}
               <span className="text-3xl sm:text-4xl md:text-5xl">{style.medal}</span>
-              <span className={`mt-1 w-full break-words leading-tight ${style.nameClass}`}>{player.name}</span>
+              <span className={`mt-1 w-full break-words font-display leading-tight ${style.nameClass}`}>{player.name}</span>
               <span className="mt-1 rounded-full bg-black/30 px-2 py-0.5 font-mono text-xs sm:text-sm font-bold text-white/90">
                 {player.score.toLocaleString("es-MX")} pts
               </span>
@@ -301,9 +298,12 @@ export default function Podium() {
 
   if (!isDemo && (!code || loadError)) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-950 to-purple-950 flex items-center justify-center p-6 text-center text-white">
-        <p className="text-xl">No pudimos cargar los resultados de este juego.</p>
-      </div>
+      <Screen center>
+        <div className="grid justify-items-center gap-4 text-center">
+          <Owl className="size-20" blink={false} />
+          <p className="m-0 font-display text-2xl font-semibold">No pudimos cargar los resultados de este juego.</p>
+        </div>
+      </Screen>
     );
   }
 
@@ -332,15 +332,15 @@ export default function Podium() {
           <AnimatePresence mode="wait">
             {finale ? (
               <motion.div key="finale" initial={{ scale: 0, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 140 }}>
-                <p className="text-5xl sm:text-6xl">🏆</p>
-                <h1 className="bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-400 bg-clip-text text-3xl font-black tracking-wide text-transparent sm:text-5xl md:text-6xl">
-                  ¡Campeones Lilihoot!
+                <p className="m-0 text-5xl sm:text-6xl">🏆</p>
+                <h1 className="m-0 bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-400 bg-clip-text font-display text-4xl font-semibold tracking-wide text-transparent sm:text-6xl md:text-7xl">
+                  ¡Campeonas Lilihoot!
                 </h1>
               </motion.div>
             ) : step === "drumroll" ? (
               <motion.h1
                 key="drumroll"
-                className="text-2xl font-black uppercase tracking-widest sm:text-4xl"
+                className="m-0 font-display text-2xl font-semibold uppercase tracking-widest sm:text-4xl"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, scale: [1, 1.08, 1] }}
                 transition={{ scale: { repeat: Infinity, duration: 0.45 } }}
@@ -348,7 +348,7 @@ export default function Podium() {
                 🥁 ¡Redoble de tambores! 🥁
               </motion.h1>
             ) : curtainOpen ? (
-              <motion.h1 key="results" className="text-2xl font-bold text-white/60 sm:text-4xl" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <motion.h1 key="results" className="m-0 font-display text-2xl font-semibold text-white/60 sm:text-4xl" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 Resultados finales
               </motion.h1>
             ) : null}
@@ -370,7 +370,7 @@ export default function Podium() {
         {/* Resto del ranking */}
         {finale && rest.length > 0 && (
           <section className="mt-10 w-full max-w-2xl">
-            <h2 className="mb-3 px-2 text-sm font-bold uppercase tracking-wider text-white/60">Resto de jugadores</h2>
+            <h2 className="mb-3 px-2 text-sm font-bold uppercase tracking-wider text-white/60">Resto de jugadoras</h2>
             <div className="space-y-2">
               {rest.map((player, index) => (
                 <motion.div
@@ -384,7 +384,7 @@ export default function Podium() {
                     <span className="w-7 shrink-0 text-center font-mono font-bold text-white/50">#{index + 4}</span>
                     <span className="truncate font-semibold">{player.name}</span>
                   </span>
-                  <span className="shrink-0 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/20 px-3 py-1 font-mono font-black text-fuchsia-200">
+                  <span className="shrink-0 rounded-lg border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 font-display font-semibold tabular-nums text-yellow-200">
                     {player.score.toLocaleString("es-MX")}
                   </span>
                 </motion.div>
@@ -395,18 +395,15 @@ export default function Podium() {
 
         {/* Jugadores (no la host, que abre el podio con ?code=): ver su % del quiz. */}
         {!isDemo && finale && !searchParams.get("code") && localStorage.getItem("studentToken") && (
-          <a href="/mis-resultados" className="mt-10 rounded-xl bg-white/15 px-5 py-3 font-semibold hover:bg-white/25">
-            📊 Ver mis resultados
+          <a href="/mis-resultados" className="mt-10 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 px-6 py-3 font-bold shadow-glow hover:from-fuchsia-400 hover:to-purple-500">
+            Ver mis resultados
           </a>
         )}
 
         {isDemo && finale && (
-          <button
-            onClick={() => { setStep("calculating"); setReplayKey((current) => current + 1); }}
-            className="mt-10 rounded-xl bg-white/15 px-5 py-3 font-semibold hover:bg-white/25"
-          >
-            ↻ Ver de nuevo (demo)
-          </button>
+          <Button variant="secondary" className="mt-10" onClick={() => { setStep("calculating"); setReplayKey((current) => current + 1); }}>
+            ↻ Ver de nuevo
+          </Button>
         )}
       </main>
 
@@ -439,11 +436,11 @@ export default function Podium() {
           animate={curtainOpen ? { opacity: 0, scale: 1.2 } : { opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
         >
-          <motion.p className="text-6xl" animate={{ rotate: [0, 12, -12, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}>
-            ☁️
-          </motion.p>
+          <motion.span className="block" animate={{ y: [0, -10, 0], rotate: [0, 6, -6, 0] }} transition={{ repeat: Infinity, duration: 1.4 }}>
+            <Owl className="size-24" />
+          </motion.span>
           <motion.p
-            className="mt-4 text-2xl font-black tracking-widest sm:text-3xl"
+            className="m-0 mt-4 font-display text-2xl font-semibold tracking-widest sm:text-3xl"
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ repeat: Infinity, duration: 1.4 }}
           >

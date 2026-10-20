@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import QRCode from "react-qr-code";
 import { formatClassDate } from "../../lib/classDates";
+import { Button, Card, Owl, PercentBar, TimerRing } from "../ui";
 import type { Game } from "../../types/Game";
 import type { HostFetch } from "../../types/Host";
 import type { IceBreaker } from "../../types/IceBreaker";
@@ -14,6 +15,10 @@ interface QuestionStat {
 
 // Respaldo: el juego siempre trae sus segundos por pregunta (los elige la host).
 const QUESTION_DURATION_SECONDS = 22;
+const LETTERS = ["A", "B", "C", "D", "E", "F"];
+
+// Qué se ve en la pantalla grande durante una pregunta.
+type Stage = "question" | "reveal" | "ranking";
 
 interface LiveGameProps {
   api: HostFetch;
@@ -24,25 +29,29 @@ interface LiveGameProps {
 
 export default function LiveGame({ api, initialGame, info, onExit }: LiveGameProps) {
   const [game, setGame] = useState<Game>(initialGame);
-  const [codeCopied, setCodeCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(initialGame.questionDurationSeconds ?? QUESTION_DURATION_SECONDS);
-  const [showExplanation, setShowExplanation] = useState(false);
+  const [stage, setStage] = useState<Stage>("question");
   const [showIceBreaker, setShowIceBreaker] = useState(false);
   const [iceBreakerQuestion, setIceBreakerQuestion] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [iceBreakerData, setIceBreakerData] = useState<IceBreaker | null>(null);
   const [stats, setStats] = useState<QuestionStat[]>([]);
+  const [advancing, setAdvancing] = useState(false);
 
   const currentQuestionIndex = useRef<number>(initialGame.currentQuestion);
+  // Puntajes al empezar la pregunta: para mostrar cuánto ganó cada quien en el ranking.
+  const [scoresAtStart, setScoresAtStart] = useState<Map<string, number>>(() => new Map(initialGame.players.map((p) => [p.id, p.score])));
 
   const gameCode = game.code;
   const joinUrl = `${window.location.origin}/join?code=${gameCode}`;
+  const duration = game.questionDurationSeconds ?? QUESTION_DURATION_SECONDS;
 
   const applyGameUpdate = useCallback((updatedGame: Game) => {
     if (currentQuestionIndex.current !== updatedGame.currentQuestion) {
       currentQuestionIndex.current = updatedGame.currentQuestion;
+      setScoresAtStart(new Map(updatedGame.players.map((p) => [p.id, p.score])));
       setTimeLeft(updatedGame.questionDurationSeconds ?? QUESTION_DURATION_SECONDS);
+      setStage("question");
     }
     setGame(updatedGame);
   }, []);
@@ -53,9 +62,13 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
   };
 
   const nextQuestion = async () => {
-    const response = await api(`/games/${gameCode}/next`, { method: "POST" });
-    if (response.ok) applyGameUpdate(await response.json());
-    setShowExplanation(false);
+    setAdvancing(true);
+    try {
+      const response = await api(`/games/${gameCode}/next`, { method: "POST" });
+      if (response.ok) applyGameUpdate(await response.json());
+    } finally {
+      setAdvancing(false);
+    }
   };
 
   const startIcebreakerHost = async () => {
@@ -111,24 +124,34 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
     return () => clearInterval(interval);
   }, [api, gameCode, showIceBreaker]);
 
-  // Temporizador de preguntas.
   const currentQuestionNumber = game.currentQuestion;
   const questionCount = game.questions.length;
-
-  useEffect(() => {
-    if (currentQuestionNumber < 0 || currentQuestionNumber >= questionCount || timeLeft <= 0) return;
-
-    const timer = setTimeout(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [currentQuestionNumber, questionCount, timeLeft]);
-
   const currentQuestion = game.questions[game.currentQuestion];
-  const liveRanking = [...game.players].sort((a, b) => b.score - a.score);
   const finished = game.currentQuestion >= questionCount;
   const started = game.currentQuestion >= 0;
+  const isLast = game.currentQuestion === questionCount - 1;
+
+  // Al llegar el cronómetro a 0 la respuesta se revela sola.
+  const view: Stage = stage === "question" && timeLeft <= 0 ? "reveal" : stage;
+
+  useEffect(() => {
+    if (currentQuestionNumber < 0 || currentQuestionNumber >= questionCount || timeLeft <= 0 || view !== "question") return;
+    const timer = setTimeout(() => setTimeLeft((prev) => Math.max(0, prev - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [currentQuestionNumber, questionCount, timeLeft, view]);
+
+  const answeredCount = currentQuestion
+    ? game.players.filter((p) => p.answeredQuestions?.includes(currentQuestion.id)).length
+    : 0;
+  const everyoneAnswered = game.players.length > 0 && answeredCount >= game.players.length;
+
+  const ranking = useMemo(
+    () =>
+      [...game.players]
+        .sort((a, b) => b.score - a.score)
+        .map((p) => ({ ...p, gained: p.score - (scoresAtStart.get(p.id) ?? 0) })),
+    [game.players, scoresAtStart],
+  );
 
   const exit = () => {
     if (started && !finished && !window.confirm("El quiz no ha terminado. Si sales, la asistencia de esta sesión no se registrará. ¿Salir de todos modos?")) {
@@ -137,296 +160,491 @@ export default function LiveGame({ api, initialGame, info, onExit }: LiveGamePro
     onExit();
   };
 
+  const copy = (text: string) => navigator.clipboard?.writeText(text).catch(() => undefined);
+
   return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 rounded-2xl bg-white/5 border border-white/10 px-5 py-3">
-        <p className="text-sm">
-          <span className="font-semibold">{info.quizTitle}</span>
-          <span className="text-slate-400"> · {info.groupName} · {formatClassDate(info.classDate)} — {info.className} · ⏱️ {info.durationSeconds} s por pregunta</span>
-        </p>
-        <button onClick={exit} className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-2 text-sm">
-          {finished ? "✓ Nueva sesión" : "Terminar sesión"}
-        </button>
-      </div>
-
-      {/* Al terminar: abrir el podio animado (misma animación que ven los jugadores) */}
-      {finished && (
-        <motion.div
-          initial={{ opacity: 0, y: -20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 160, damping: 14 }}
-          className="mb-6 flex flex-col items-center gap-4 rounded-3xl border border-yellow-300/40 bg-gradient-to-r from-amber-500/25 via-fuchsia-600/25 to-purple-700/25 p-5 text-center sm:flex-row sm:justify-between sm:text-left"
-        >
-          <div>
-            <p className="text-2xl font-black">🏁 ¡Quiz terminado!</p>
-            <p className="text-sm text-slate-200">La asistencia ya se registró. Muestra a los campeones en pantalla grande.</p>
-          </div>
+    <div className="grid gap-5">
+      {/* Barra de la sesión */}
+      <Card tone="soft" className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <p className="m-0 truncate font-display text-lg font-semibold">{info.quizTitle}</p>
+          <p className="m-0 truncate text-sm text-slate-400">
+            {info.groupName} · {formatClassDate(info.classDate)} — {info.className} · {info.durationSeconds} s por pregunta
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => window.open(`/podium?code=${encodeURIComponent(gameCode)}`, "_blank", "noopener")}
-            className="w-full shrink-0 rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-500 px-6 py-4 text-lg font-black text-purple-950 shadow-[0_0_30px_rgba(251,191,36,0.5)] transition hover:scale-105 sm:w-auto"
+            type="button"
+            onClick={() => setShowQrModal(true)}
+            className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-1.5 font-display text-lg font-semibold tracking-widest text-fuchsia-200 hover:bg-fuchsia-500/25"
+            title="Mostrar código y QR"
           >
-            🏆 Ver podio
+            {gameCode}
           </button>
-        </motion.div>
-      )}
+          <Button variant="secondary" size="sm" onClick={exit}>
+            {finished ? "Nueva sesión" : "Terminar sesión"}
+          </Button>
+        </div>
+      </Card>
 
-      {/* MODAL ICEBREAKER */}
-      {showIceBreaker && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-3xl rounded-3xl bg-slate-900 p-8 shadow-2xl border border-white/10 overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-extrabold text-pink-400 flex items-center gap-2">⏳ Chismesito time</h2>
-              <button onClick={() => setShowIceBreaker(false)} className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-2">
-                Ocultar Ventana
-              </button>
+      <AnimatePresence mode="wait">
+        {!started && (
+          <Lobby
+            key="lobby"
+            joinUrl={joinUrl}
+            gameCode={gameCode}
+            players={game.players.length}
+            questionCount={questionCount}
+            onStart={() => void startGame()}
+            onIcebreaker={() => { setShowIceBreaker(true); setIceBreakerData(null); }}
+            onEnlargeQr={() => setShowQrModal(true)}
+            onCopy={copy}
+          />
+        )}
+
+        {started && !finished && currentQuestion && (
+          <motion.section key={`q-${game.currentQuestion}`} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="grid gap-5">
+            <Card className="grid gap-5 p-5 sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-bold text-slate-200">
+                  Pregunta {game.currentQuestion + 1} de {questionCount}
+                </span>
+                <AnsweredMeter answered={answeredCount} total={game.players.length} />
+              </div>
+
+              <div className="grid items-center gap-5 sm:grid-cols-[auto_1fr]">
+                <div className="justify-self-center">
+                  {view === "question" ? (
+                    <TimerRing seconds={timeLeft} total={duration} size={112} />
+                  ) : (
+                    <div className="grid size-28 place-items-center rounded-full border-4 border-green-300/60 bg-green-500/15 text-center font-display text-sm font-semibold text-green-200">
+                      {timeLeft > 0 ? <>Todas<br />contestaron</> : <>Tiempo<br />cerrado</>}
+                    </div>
+                  )}
+                </div>
+                <h2 className="m-0 text-balance text-center font-display text-3xl font-semibold leading-tight break-words sm:text-left sm:text-4xl">
+                  {currentQuestion.text}
+                </h2>
+              </div>
+
+              {view === "ranking" ? (
+                <RankingBoard ranking={ranking} />
+              ) : (
+                <OptionsBoard question={currentQuestion} revealed={view === "reveal"} />
+              )}
+
+              {view === "reveal" && currentQuestion.explanation && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="grid gap-1 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-5">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-fuchsia-300">¿Por qué?</span>
+                  <p className="m-0 text-lg leading-relaxed text-slate-100 sm:text-xl">{currentQuestion.explanation}</p>
+                </motion.div>
+              )}
+            </Card>
+
+            {/* Controles de la host */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {view === "question" && (
+                <>
+                  {/* Revelar antes de tiempo dejaría ver la respuesta a quien aún puede contestar. */}
+                  <span className={`mr-auto text-sm font-semibold ${everyoneAnswered ? "text-green-300" : "text-slate-400"}`}>
+                    {everyoneAnswered ? "¡Ya respondieron todas!" : "La respuesta se revela al acabar el tiempo o cuando todas contesten."}
+                  </span>
+                  <Button variant="gold" size="lg" onClick={() => setStage("reveal")} disabled={!everyoneAnswered}>
+                    Revelar respuesta
+                  </Button>
+                </>
+              )}
+              {view === "reveal" && (
+                <>
+                  <Button variant="secondary" size="lg" onClick={() => setStage("ranking")}>
+                    Ver ranking
+                  </Button>
+                  <Button size="lg" onClick={() => void nextQuestion()} loading={advancing}>
+                    {isLast ? "Terminar quiz" : "Siguiente pregunta"}
+                  </Button>
+                </>
+              )}
+              {view === "ranking" && (
+                <>
+                  <Button variant="secondary" size="lg" onClick={() => setStage("reveal")}>
+                    Volver a la respuesta
+                  </Button>
+                  <Button size="lg" onClick={() => void nextQuestion()} loading={advancing}>
+                    {isLast ? "Terminar quiz" : "Siguiente pregunta"}
+                  </Button>
+                </>
+              )}
             </div>
+          </motion.section>
+        )}
 
+        {finished && (
+          <motion.section key="finished" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="grid gap-5">
+            <Card className="flex flex-col items-center gap-5 border-yellow-300/40 bg-gradient-to-r from-amber-500/20 via-fuchsia-600/20 to-purple-700/20 p-6 text-center sm:flex-row sm:justify-between sm:text-left">
+              <div className="flex items-center gap-4">
+                <Owl className="size-16 shrink-0" />
+                <div>
+                  <h2 className="m-0 font-display text-3xl font-semibold">¡Quiz terminado!</h2>
+                  <p className="m-0 text-slate-200">La asistencia ya se registró. Muestra a las campeonas en pantalla grande.</p>
+                </div>
+              </div>
+              <Button variant="gold" size="lg" onClick={() => window.open(`/podium?code=${encodeURIComponent(gameCode)}`, "_blank", "noopener")}>
+                Ver podio
+              </Button>
+            </Card>
+            <div className="grid gap-5 lg:grid-cols-2">
+              <Card className="p-5 sm:p-6">
+                <h3 className="m-0 mb-4 text-xl">Ranking final</h3>
+                <RankingBoard ranking={ranking} limit={10} showGained={false} />
+              </Card>
+              <SessionStats stats={stats} />
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      {started && !finished && <SessionStats stats={stats} collapsible />}
+
+      {/* Rompehielos */}
+      <AnimatePresence>
+        {showIceBreaker && (
+          <Modal onClose={() => setShowIceBreaker(false)} title="Chismesito time" wide>
             {!iceBreakerData?.active ? (
-              <div className="space-y-4">
-                <p className="text-slate-300">Escribe una pregunta abierta para lanzar a los alumnos mientras esperan.</p>
+              <div className="grid gap-4">
+                <p className="m-0 text-slate-300">Escribe una pregunta abierta para lanzar a las alumnas mientras esperan.</p>
                 <textarea
                   value={iceBreakerQuestion}
                   onChange={(e) => setIceBreakerQuestion(e.target.value)}
                   placeholder="Ej: ¿Cómo pides tú el elote?"
-                  className="w-full min-h-24 rounded-xl bg-white/5 border border-white/20 p-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-pink-500"
+                  className="min-h-28 w-full rounded-xl border border-white/15 bg-white/[0.07] p-3.5 text-lg text-white placeholder:text-slate-500 focus:border-fuchsia-400 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/25"
                 />
-                <button
-                  onClick={startIcebreakerHost}
-                  disabled={!iceBreakerQuestion}
-                  className="w-full p-4 rounded-xl bg-pink-600 hover:bg-pink-500 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  🚀 Lanzar Pregunta
-                </button>
+                <Button size="lg" block onClick={() => void startIcebreakerHost()} disabled={!iceBreakerQuestion}>
+                  Lanzar pregunta
+                </Button>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="bg-black/30 p-4 rounded-2xl border border-pink-500/20">
-                  <span className="text-xs text-pink-400 uppercase tracking-wider font-bold">Pregunta actual:</span>
-                  <h3 className="text-2xl font-bold mt-1 text-white">{iceBreakerData.question}</h3>
+              <div className="grid gap-5">
+                <div className="rounded-2xl border border-fuchsia-500/30 bg-black/30 p-4">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-fuchsia-300">Pregunta</span>
+                  <p className="m-0 mt-1 font-display text-2xl font-semibold">{iceBreakerData.question}</p>
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold mb-3 text-slate-300">Respuestas Recibidas ({iceBreakerData.answers.length})</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2">
-                    {iceBreakerData.answers.map((ans) => (
-                      <div key={ans.id} className="bg-white/5 border border-white/10 rounded-xl p-4 shadow-sm">
-                        <p className="text-white mb-2 italic">"{ans.text}"</p>
-                        <span className="text-xs text-fuchsia-400 font-semibold">👤 {ans.playerName}</span>
-                      </div>
-                    ))}
+                  <p className="m-0 mb-3 font-semibold text-slate-300">Respuestas ({iceBreakerData.answers.length})</p>
+                  <div className="grid max-h-72 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+                    <AnimatePresence>
+                      {iceBreakerData.answers.map((ans) => (
+                        <motion.div key={ans.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <p className="m-0 mb-2 text-lg text-white">“{ans.text}”</p>
+                          <span className="text-xs font-bold text-fuchsia-300">{ans.playerName}</span>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                     {iceBreakerData.answers.length === 0 && (
-                      <p className="text-slate-500 col-span-2 text-center py-4">Esperando respuestas de los alumnos...</p>
+                      <p className="col-span-full m-0 py-4 text-center text-slate-500">Esperando respuestas…</p>
                     )}
                   </div>
                 </div>
-                <button onClick={closeIcebreakerHost} className="w-full p-4 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-white transition-all shadow-lg">
-                  🛑 Cerrar Rompehielos e ir a por la victoria
-                </button>
+                <Button variant="danger" size="lg" block onClick={() => void closeIcebreakerHost()}>
+                  Cerrar el rompehielos
+                </Button>
               </div>
             )}
-          </motion.div>
-        </div>
-      )}
+          </Modal>
+        )}
+      </AnimatePresence>
 
-      {/* CONTENIDO PRINCIPAL EN TRES COLUMNAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* COLUMNA 1: Panel Control de la Sala */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6">
-          <h2 className="text-2xl mb-4">Sala</h2>
-          <button onClick={() => { setShowIceBreaker(true); setIceBreakerData(null); }} className="w-full bg-pink-600 mb-3 p-3 text-white font-bold rounded-xl">
-            🍦 Ice Breaker
-          </button>
-          <button onClick={startGame} disabled={started} className="w-full mb-3 p-3 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-50">
-            Iniciar Juego
-          </button>
-          <button onClick={nextQuestion} disabled={!started || finished} className="w-full mb-3 p-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50">
-            {game.currentQuestion === questionCount - 1 ? "Terminar quiz" : "Siguiente Pregunta"}
-          </button>
-          {finished && (
-            <p className="text-sm text-emerald-300 mb-3">✓ Quiz terminado. La asistencia se registró para quienes participaron.</p>
-          )}
-
-          <h3 className="mt-8 text-lg">Código</h3>
-          <div className="mt-4 flex flex-col items-center gap-4">
-            <div onClick={() => setShowQrModal(true)} className="bg-white p-4 rounded-2xl shadow-xl cursor-zoom-in hover:scale-105 transition-all duration-300">
-              <QRCode value={joinUrl} size={150} />
-              <p className="mt-2 text-center text-gray-600 text-xs font-semibold">🔍 Ampliar</p>
-            </div>
-            <div className="flex gap-2 w-full">
-              <button onClick={() => navigator.clipboard.writeText(joinUrl)} className="flex-1 bg-fuchsia-600 py-2 rounded-xl text-white text-sm">
-                📋 Link
-              </button>
-              <button onClick={() => navigator.clipboard.writeText(gameCode)} className="flex-1 bg-fuchsia-600 py-2 rounded-xl text-white text-sm">
-                🔢 Código
-              </button>
-            </div>
-            <p className="text-fuchsia-300 font-bold text-2xl tracking-wider">{gameCode}</p>
-          </div>
-        </div>
-
-        {/* COLUMNA 2: Pregunta Actual & Estadísticas Integradas */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 flex flex-col gap-6">
-          <div>
-            <h2 className="text-2xl mb-4">Pregunta Actual</h2>
-            {currentQuestion ? (
-              <>
-                <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl bg-black/20 p-4">
-                  <div>
-                    <p className="text-sm text-slate-300">Cronómetro</p>
-                    <p className="text-4xl font-black text-fuchsia-300">{timeLeft}s</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-slate-300">Puntos máx.</p>
-                    <p className="text-2xl font-bold text-yellow-300">{timeLeft * 100}</p>
-                  </div>
-                </div>
-
-                <h3 className="text-2xl font-bold mb-4">{currentQuestion.text}</h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {currentQuestion.options.map((option, index) => (
-                    <button
-                      key={index}
-                      className={`p-4 rounded-2xl text-white font-bold transition-all text-left px-6 ${
-                        showExplanation && index === currentQuestion.correctAnswer
-                          ? "bg-gradient-to-r from-green-500 to-emerald-600 ring-4 ring-green-300 scale-102"
-                          : "bg-gradient-to-r from-fuchsia-500 to-purple-600"
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-
-                <button onClick={() => setShowExplanation(!showExplanation)} className="mt-4 flex items-center gap-2 rounded-xl bg-yellow-500/20 px-4 py-2 hover:bg-yellow-500/40 text-sm">
-                  💡 {showExplanation ? "Ocultar explicación" : "Mostrar explicación"}
-                </button>
-
-                {showExplanation && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-xl bg-green-500/10 border border-green-400/30 p-4">
-                    <p className="text-sm text-green-300 mb-1">💡 Explicación</p>
-                    <p className="text-white text-sm">{currentQuestion.explanation}</p>
-                  </motion.div>
-                )}
-              </>
-            ) : (
-              <div className="text-center mt-6 text-slate-400">
-                <p className="text-3xl mb-2">{finished ? "🏁" : "🎮"}</p>
-                <p>{finished ? "¡Quiz terminado!" : "Esperando inicio de la trivia..."}</p>
+      {/* QR grande */}
+      <AnimatePresence>
+        {showQrModal && (
+          <Modal onClose={() => setShowQrModal(false)} title="Únete a Lilihoot">
+            <div className="grid justify-items-center gap-5 text-center">
+              <div className="rounded-3xl bg-white p-5">
+                <QRCode value={joinUrl} size={260} />
               </div>
-            )}
-          </div>
+              <p className="m-0 font-display text-5xl font-semibold tracking-widest text-fuchsia-200">{gameCode}</p>
+              <p className="m-0 text-sm text-slate-400">Escanea con la cámara del celular o entra a la página y escribe el código.</p>
+              <div className="grid w-full gap-2 sm:grid-cols-2">
+                <CopyButton text={gameCode} label="Copiar código" onCopy={copy} />
+                <CopyButton text={joinUrl} label="Copiar enlace" onCopy={copy} />
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
-          {/* SECCIÓN ESTADÍSTICAS */}
-          <div className="border-t border-white/10 pt-6">
-            <h2 className="text-2xl font-bold text-white mb-2">📊 Estadísticas de la sesión</h2>
-            <p className="text-xs text-gray-400 mb-4">Rendimiento por pregunta en tiempo real.</p>
+/* ---------- piezas de la vista en vivo ---------- */
 
-            <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
-              {stats.map((stat, i) => (
-                <div key={i} className="bg-black/20 rounded-xl p-3 border border-white/5">
-                  <h4 className="text-sm font-semibold text-white mb-2 truncate">{stat.text}</h4>
-                  <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
-                    <div
-                      style={{ width: `${stat.percentage}%` }}
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        stat.percentage >= 90 ? "bg-green-500" :
-                        stat.percentage >= 70 ? "bg-yellow-400" :
-                        stat.percentage >= 50 ? "bg-orange-400" : "bg-red-500"
-                      }`}
-                    />
-                  </div>
-                  <div className="mt-1 flex justify-between items-center text-xs">
-                    <span className="text-slate-400">Aciertos</span>
-                    <span className="font-bold text-white">{stat.percentage}%</span>
-                  </div>
-                </div>
+function Lobby({ joinUrl, gameCode, players, questionCount, onStart, onIcebreaker, onEnlargeQr, onCopy }: {
+  joinUrl: string;
+  gameCode: string;
+  players: number;
+  questionCount: number;
+  onStart: () => void;
+  onIcebreaker: () => void;
+  onEnlargeQr: () => void;
+  onCopy: (text: string) => void;
+}) {
+  const reduce = useReducedMotion();
+  const owls = Math.min(players, 40);
+
+  return (
+    <motion.section initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_1fr]">
+      <Card className="grid justify-items-center gap-4 p-6 text-center">
+        <p className="m-0 text-sm font-bold uppercase tracking-wider text-slate-400">Entra con el código</p>
+        <p className="m-0 font-display text-5xl font-semibold tracking-widest text-fuchsia-200">{gameCode}</p>
+        <button type="button" onClick={onEnlargeQr} className="cursor-zoom-in rounded-3xl bg-white p-4 transition hover:scale-[1.03]" title="Ampliar QR">
+          <QRCode value={joinUrl} size={180} />
+        </button>
+        <div className="grid w-full grid-cols-2 gap-2">
+          <CopyButton text={gameCode} label="Código" onCopy={onCopy} />
+          <CopyButton text={joinUrl} label="Enlace" onCopy={onCopy} />
+        </div>
+      </Card>
+
+      <Card className="grid content-between gap-6 p-6">
+        <div className="grid justify-items-center gap-2 text-center">
+          <motion.p
+            key={players}
+            initial={reduce ? false : { scale: 1.5, color: "#F0ABFC" }}
+            animate={{ scale: 1, color: "#FFFFFF" }}
+            transition={{ type: "spring", stiffness: 260, damping: 14 }}
+            className="m-0 font-display text-8xl font-semibold tabular-nums"
+          >
+            {players}
+          </motion.p>
+          <p className="m-0 text-lg text-slate-300">
+            {players === 0 ? "Esperando a que entren…" : players === 1 ? "alumna conectada" : "alumnas conectadas"}
+          </p>
+          <div className="mt-2 flex max-w-xl flex-wrap justify-center gap-1.5" aria-hidden="true">
+            <AnimatePresence>
+              {Array.from({ length: owls }, (_, i) => (
+                <motion.span key={i} initial={{ scale: 0, y: 10 }} animate={{ scale: 1, y: 0 }} transition={{ type: "spring", stiffness: 400, damping: 15 }}>
+                  <Owl className="size-8" blink={false} />
+                </motion.span>
               ))}
-              {stats.length === 0 && (
-                <p className="text-xs text-slate-500 text-center py-4">No hay estadísticas disponibles aún.</p>
+            </AnimatePresence>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+          <p className="m-0 text-sm text-slate-400">{questionCount} {questionCount === 1 ? "pregunta" : "preguntas"} listas.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onIcebreaker}>Rompehielos</Button>
+            <Button size="lg" onClick={onStart}>
+              Iniciar juego
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </motion.section>
+  );
+}
+
+function AnsweredMeter({ answered, total }: { answered: number; total: number }) {
+  const pct = total > 0 ? (answered / total) * 100 : 0;
+  return (
+    <div className="flex min-w-48 items-center gap-3" aria-live="polite">
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+        <motion.div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-purple-500" animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
+      </div>
+      <span className="text-sm font-bold tabular-nums text-slate-200">
+        {answered} de {total} respondieron
+      </span>
+    </div>
+  );
+}
+
+// Opciones de la pregunta. Al revelar, cada una muestra cuántas la eligieron,
+// la correcta se pinta de verde y se señala el error más común.
+function OptionsBoard({ question, revealed }: { question: Game["questions"][number]; revealed: boolean }) {
+  const counts = question.options.map((_, i) => question.answers?.[i] ?? 0);
+  const total = counts.reduce((a, b) => a + b, 0);
+  const wrong = counts.map((c, i) => ({ c, i })).filter(({ i }) => i !== question.correctAnswer).sort((a, b) => b.c - a.c)[0];
+  const commonMistake = revealed && wrong && wrong.c > 0 ? wrong.i : -1;
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {question.options.map((option, index) => {
+        const correct = index === question.correctAnswer;
+        const count = counts[index] ?? 0;
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+        const tone = !revealed
+          ? "from-fuchsia-500 to-purple-600"
+          : correct
+            ? "from-green-500 to-emerald-600 ring-4 ring-green-300"
+            : "from-white/10 to-white/5";
+
+        return (
+          <motion.div
+            key={index}
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: revealed && !correct ? 0.85 : 1, y: 0, scale: revealed && correct ? 1.02 : 1 }}
+            transition={{ delay: revealed ? 0 : 0.05 * index }}
+            className={`relative overflow-hidden rounded-2xl bg-gradient-to-r p-4 sm:p-5 ${tone}`}
+          >
+            {revealed && (
+              <motion.div
+                aria-hidden="true"
+                className={`absolute inset-y-0 left-0 ${correct ? "bg-white/15" : "bg-fuchsia-500/25"}`}
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.9, ease: "easeOut", delay: 0.1 }}
+              />
+            )}
+            <div className="relative flex items-center gap-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/20 font-display text-xl font-semibold">
+                {revealed && correct ? "✓" : LETTERS[index] ?? index + 1}
+              </span>
+              <span className="min-w-0 flex-1 text-lg font-bold break-words sm:text-xl">{option}</span>
+              {revealed && (
+                <span className="shrink-0 text-right">
+                  <span className="block font-display text-2xl font-semibold tabular-nums">{count}</span>
+                  <span className="block text-xs font-bold text-white/70">{pct}%</span>
+                </span>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* COLUMNA 3: Total de jugadores (sin nicknames) & Ranking */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6">
-          <h2 className="text-2xl mb-4">👥 Jugadores</h2>
-          <div className="mb-6 rounded-2xl bg-black/20 p-5 text-center">
-            <motion.p
-              key={game.players.length}
-              initial={{ scale: 1.4, color: "#f0abfc" }}
-              animate={{ scale: 1, color: "#ffffff" }}
-              transition={{ type: "spring", stiffness: 260, damping: 14 }}
-              className="text-6xl font-black"
-            >
-              {game.players.length}
-            </motion.p>
-            <p className="mt-1 text-sm text-slate-300">
-              {game.players.length === 0
-                ? "Esperando que entren participantes..."
-                : game.players.length === 1 ? "jugador conectado" : "jugadores conectados"}
-            </p>
-          </div>
-
-          <hr className="my-4 border-white/20" />
-
-          <h2 className="text-2xl mb-4">🏆 Ranking</h2>
-          <div className="space-y-2">
-            {liveRanking.map((player, index) => (
-              <div key={player.id} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                <span className="text-sm font-medium">
-                  {["🥇", "🥈", "🥉"][index] ?? `#${index + 1}`} {player.name}
-                </span>
-                <span className="font-bold text-fuchsia-400">{player.score}</span>
-              </div>
-            ))}
-            {liveRanking.length === 0 && (
-              <p className="text-sm text-slate-400">El ranking aparecerá cuando envíen respuestas.</p>
+            {index === commonMistake && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.8 }}
+                className="relative mt-3 inline-block rounded-full bg-red-500/25 px-3 py-1 text-xs font-extrabold text-red-200"
+              >
+                Error más común: vale la pena aclararlo
+              </motion.span>
             )}
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
 
-      {/* MODAL QR EXPANDIDO */}
-      {showQrModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="relative bg-slate-950 border border-white/10 rounded-[32px] p-8 max-w-md w-full flex flex-col items-center justify-center text-center shadow-2xl">
-            <button
-              onClick={() => setShowQrModal(false)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-lg flex items-center justify-center hover:bg-fuchsia-600 transition-all duration-300"
-            >
-              ✕
-            </button>
-            <h3 className="text-2xl font-bold mb-6">🚀 Únete a Lilihoot</h3>
-            <div className="bg-white p-6 rounded-2xl mb-6 shadow-inner">
-              <QRCode value={joinUrl} size={260} />
-            </div>
-            <p className="text-sm text-slate-400 mb-6">📱 Escanea con la cámara de tu celular</p>
-            <div className="flex flex-col gap-2 w-full">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(gameCode);
-                  setCodeCopied(true);
-                  setTimeout(() => setCodeCopied(false), 2000);
-                }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 font-bold text-sm"
-              >
-                {codeCopied ? "✅ Código copiado" : "🔢 Copiar código"}
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(joinUrl);
-                  setLinkCopied(true);
-                  setTimeout(() => setLinkCopied(false), 2000);
-                }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 font-bold text-sm"
-              >
-                {linkCopied ? "✅ Enlace copiado" : "📋 Copiar enlace"}
-              </button>
-            </div>
+type RankedPlayer = Game["players"][number] & { gained: number };
+
+function RankingBoard({ ranking, limit = 5, showGained = true }: { ranking: RankedPlayer[]; limit?: number; showGained?: boolean }) {
+  const top = ranking.slice(0, limit);
+  const max = Math.max(1, ...top.map((p) => p.score));
+  const medal = ["bg-gradient-to-r from-yellow-300 to-amber-400 text-purple-950", "bg-slate-200 text-purple-950", "bg-amber-700 text-white"];
+
+  if (top.length === 0) return <p className="m-0 text-slate-400">El ranking aparecerá cuando contesten.</p>;
+
+  return (
+    <ol className="m-0 grid list-none gap-2.5 p-0">
+      {top.map((player, i) => (
+        <motion.li
+          key={player.id}
+          layout
+          initial={{ opacity: 0, x: -24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 26, delay: 0.06 * i }}
+          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3"
+        >
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-fuchsia-500/30 to-purple-600/20"
+            initial={{ width: 0 }}
+            animate={{ width: `${(player.score / max) * 100}%` }}
+            transition={{ duration: 0.8, delay: 0.1 + 0.06 * i }}
+          />
+          <div className="relative flex items-center gap-3">
+            <span className={`grid size-9 shrink-0 place-items-center rounded-full font-display font-semibold ${medal[i] ?? "bg-white/10 text-white"}`}>{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-lg font-bold">{player.name}</span>
+            {showGained && player.gained > 0 && (
+              <span className="shrink-0 rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-extrabold text-green-300">+{player.gained}</span>
+            )}
+            <span className="shrink-0 font-display text-xl font-semibold tabular-nums text-yellow-300">{player.score.toLocaleString("es-MX")}</span>
           </div>
+        </motion.li>
+      ))}
+    </ol>
+  );
+}
+
+function SessionStats({ stats, collapsible = false }: { stats: QuestionStat[]; collapsible?: boolean }) {
+  const body = (
+    <div className="grid gap-3">
+      {stats.map((stat, i) => (
+        <div key={i} className="grid gap-1.5">
+          <p className="m-0 truncate text-sm font-semibold">{i + 1}. {stat.text}</p>
+          <PercentBar value={stat.percentage} />
         </div>
-      )}
-    </>
+      ))}
+      {stats.length === 0 && <p className="m-0 py-2 text-sm text-slate-400">Las estadísticas aparecen cuando llegan respuestas.</p>}
+    </div>
+  );
+
+  if (collapsible) {
+    return (
+      <details className="group rounded-2xl border border-white/10 bg-white/5 p-4">
+        <summary className="cursor-pointer list-none font-display text-lg font-semibold marker:hidden">
+          Estadísticas de la sesión <span className="text-sm font-normal text-slate-400 group-open:hidden">· mostrar</span>
+        </summary>
+        <div className="mt-4">{body}</div>
+      </details>
+    );
+  }
+  return (
+    <Card className="p-5 sm:p-6">
+      <h3 className="m-0 mb-4 text-xl">Aciertos por pregunta</h3>
+      {body}
+    </Card>
+  );
+}
+
+function CopyButton({ text, label, onCopy }: { text: string; label: string; onCopy: (text: string) => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => {
+        onCopy(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+    >
+      {copied ? "¡Copiado!" : label}
+    </Button>
+  );
+}
+
+function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className={`max-h-[90vh] w-full overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/95 p-6 shadow-2xl sm:p-8 ${wide ? "max-w-3xl" : "max-w-md"}`}
+      >
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h2 className="m-0 font-display text-2xl font-semibold">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Cerrar" className="grid size-10 place-items-center rounded-full bg-white/10 hover:bg-white/20">
+            ✕
+          </button>
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
   );
 }
