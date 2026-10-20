@@ -116,7 +116,7 @@ function QuestionEditor({ question, index, total, onChange, onMove, onRemove }: 
 
       <select value={question.type} onChange={(e) => onChange({ type: e.target.value as PracticeQuestionType })} className={`${fieldClass} mb-3`}>
         {(Object.keys(PRACTICE_TYPE_LABEL) as PracticeQuestionType[]).map((type) => (
-          <option key={type} value={type} className="text-black">{PRACTICE_TYPE_LABEL[type]}</option>
+          <option key={type} value={type}>{PRACTICE_TYPE_LABEL[type]}</option>
         ))}
       </select>
 

@@ -43,9 +43,9 @@ function CommonFieldsForm({ value, onChange, modules }: {
       <div>
         <label className={labelClass}>Módulo</label>
         <select value={value.moduleId} onChange={(e) => set({ moduleId: e.target.value })} className={fieldClass}>
-          {modules.length === 0 && <option value="" className="text-black">No hay módulos</option>}
+          {modules.length === 0 && <option value="">No hay módulos</option>}
           {modules.map((module) => (
-            <option key={module.id} value={module.id} className="text-black">{module.orderNumber}. {module.name}</option>
+            <option key={module.id} value={module.id}>{module.orderNumber}. {module.name}</option>
           ))}
         </select>
       </div>
@@ -234,7 +234,7 @@ function EditClassForm({ api, classItem, groups, modules, onSaved, onCancel }: {
           <label className={labelClass}>Grupo</label>
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={fieldClass}>
             {groups.map((group) => (
-              <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+              <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
         </div>
@@ -372,9 +372,9 @@ export default function ClassesPanel({ api, onChanged }: ClassesPanelProps) {
             ))}
           </div>
           <select value={filterGroupId} onChange={(e) => setFilterGroupId(e.target.value)} className={`${fieldClass} md:max-w-xs`}>
-            <option value="" className="text-black">Todos los grupos</option>
+            <option value="">Todos los grupos</option>
             {catalog.groups.map((group) => (
-              <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+              <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
         </div>

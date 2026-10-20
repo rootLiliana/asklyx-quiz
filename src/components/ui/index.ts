@@ -5,3 +5,5 @@ export { Field, inputBaseClass } from "./Field";
 export { Owl, Wordmark } from "./Logo";
 export { TimerRing } from "./TimerRing";
 export { LoadingDots } from "./LoadingDots";
+export { Icon, type IconName } from "./Icon";
+export { PercentBar } from "./PercentBar";

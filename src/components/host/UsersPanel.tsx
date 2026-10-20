@@ -172,7 +172,6 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
     <section className={panelClass}>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold">Usuarias</h2>
           <p className="text-sm text-slate-400">
             {canEdit
               ? "Para agregar una Host: que se registre como alumno y aquí le das acceso."
@@ -182,10 +181,10 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
         <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, nickname o correo..." className={fieldClass} />
           <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className={fieldClass}>
-            <option value="" className="text-black">Todos los grupos</option>
-            <option value="none" className="text-black">⚠️ Alumnos sin grupo ({studentsWithoutGroup})</option>
+            <option value="">Todos los grupos</option>
+            <option value="none">⚠️ Alumnos sin grupo ({studentsWithoutGroup})</option>
             {groups.map((group) => (
-              <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+              <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
         </div>
@@ -237,9 +236,9 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
                       onChange={(e) => void setStudentGroup(user, e.target.value)}
                       className={`rounded-lg border p-2 text-white ${groupsByUser[user.id]?.length ? "border-white/20 bg-white/10" : "border-amber-400/60 bg-amber-500/10"}`}
                     >
-                      <option value="" className="text-black">Sin grupo</option>
+                      <option value="">Sin grupo</option>
                       {groups.map((group) => (
-                        <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+                        <option key={group.id} value={group.id}>{group.name}</option>
                       ))}
                     </select>
                   ) : groupsByUser[user.id]?.length ? (

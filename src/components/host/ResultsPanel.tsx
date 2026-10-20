@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useClassCatalog } from "../../hooks/useClassCatalog";
 import { formatClassDate } from "../../lib/classDates";
 import { fieldClass, labelClass, panelClass } from "../../lib/hostStyles";
-import { percentageBarClass, percentageTextClass } from "../../lib/percentage";
+import { percentageTextClass } from "../../lib/percentage";
+import { PercentBar } from "../ui";
 import { getTodayGroupName } from "../../lib/studentGroup";
 import type { HostFetch } from "../../types/Host";
 import type { SessionResultDetail, SessionResultSummary, StudentHistory } from "../../types/Results";
@@ -114,20 +115,18 @@ function SessionDetailView({ api, sessionId, onBack, onOpenStudent }: {
       </section>
 
       <section className={panelClass}>
-        <h3 className="text-xl font-bold mb-1">❗ Preguntas más falladas</h3>
+        <h3 className="text-xl font-bold mb-1">Preguntas más falladas</h3>
         <p className="text-xs text-slate-400 mb-4">% de quienes la contestaron bien. Las primeras son buenas candidatas para repasar.</p>
         <div className="grid grid-cols-1 gap-3">
           {questions.map((question) => (
-            <div key={question.questionId} className="rounded-xl bg-black/20 p-3">
+            <div key={question.questionId} className="rounded-2xl border border-white/5 bg-black/20 p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-semibold break-words min-w-0">
                   {question.text ?? <span className="italic text-slate-400">(pregunta editada o borrada después de la sesión)</span>}
                 </p>
                 <span className="shrink-0 text-sm"><PercentBadge value={question.percentage} /></span>
               </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                <div className={`h-full rounded-full ${percentageBarClass(question.percentage)}`} style={{ width: `${question.percentage}%` }} />
-              </div>
+              <div className="mt-2"><PercentBar value={question.percentage} /></div>
               <p className="mt-1 text-xs text-slate-400">{question.correct} de {question.answered} acertaron</p>
             </div>
           ))}
@@ -135,7 +134,7 @@ function SessionDetailView({ api, sessionId, onBack, onOpenStudent }: {
       </section>
 
       <section className={panelClass}>
-        <h3 className="text-xl font-bold mb-4">👥 Alumnos ({students.length})</h3>
+        <h3 className="text-xl font-bold mb-4">Alumnas ({students.length})</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-slate-400">
@@ -225,14 +224,13 @@ export default function ResultsPanel({ api }: { api: HostFetch }) {
   return (
     <div className="grid grid-cols-1 gap-6">
       <section className={panelClass}>
-        <h2 className="text-2xl font-bold mb-1">📊 Resultados</h2>
-        <p className="text-sm text-slate-400 mb-4">El promedio es el % de aciertos. Los puntos solo cuentan para el podio.</p>
+        <p className="text-sm text-slate-400 mb-4">Los puntos solo cuentan para el podio; aquí se mide el % de aciertos.</p>
         <div className="md:max-w-sm">
           <label className={labelClass}>Grupo</label>
           <select value={groupId} onChange={(e) => setGroupChoice(e.target.value)} className={fieldClass}>
-            <option value="" className="text-black">Todos los grupos</option>
+            <option value="">Todos los grupos</option>
             {catalog.groups.map((group) => (
-              <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+              <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
         </div>
@@ -253,14 +251,12 @@ export default function ResultsPanel({ api }: { api: HostFetch }) {
             <h3 className="text-xl font-bold mb-4">Promedio por quiz</h3>
             <div className="grid grid-cols-1 gap-2">
               {quizSummaries.map((quiz) => (
-                <div key={quiz.quizId} className="rounded-xl bg-black/20 p-3">
+                <div key={quiz.quizId} className="rounded-2xl border border-white/5 bg-black/20 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold truncate min-w-0">{quiz.title}</p>
                     <PercentBadge value={quiz.average} />
                   </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                    <div className={`h-full rounded-full ${percentageBarClass(quiz.average)}`} style={{ width: `${quiz.average}%` }} />
-                  </div>
+                  <div className="mt-2"><PercentBar value={quiz.average} /></div>
                   <p className="mt-1 text-xs text-slate-400">
                     {quiz.sessions} {quiz.sessions === 1 ? "sesión" : "sesiones"} · {quiz.students} {quiz.students === 1 ? "alumno" : "alumnos"}
                   </p>

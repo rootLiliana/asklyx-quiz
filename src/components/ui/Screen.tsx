@@ -14,7 +14,7 @@ export function Screen({ children, center = false, className = "" }: ScreenProps
   const reduce = useReducedMotion();
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-gradient-to-br from-purple-900 via-indigo-900 to-black text-white">
+    <div className="relative min-h-dvh overflow-clip bg-gradient-to-br from-purple-900 via-indigo-900 to-black text-white">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <motion.div
           className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-fuchsia-500/25 blur-3xl"

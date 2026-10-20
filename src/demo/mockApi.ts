@@ -1,6 +1,10 @@
 // API simulada para la vista previa: responde en el navegador lo mismo que
 // respondería el servidor, para poder probar las pantallas sin backend.
 import { API } from "../config/api";
+import {
+  CLASSES, DEMO_HOST, GROUPS, MEMBERSHIPS, MODULES, QUIZZES, USERS,
+  attendanceFor, resultDetail, resultSessions, studentHistory,
+} from "./hostFixtures";
 
 export type DemoPhase = "waiting" | "question" | "finished";
 
@@ -126,7 +130,41 @@ function handle(path: string, init?: RequestInit): Response {
     ]);
   }
 
-  return json({ message: "No disponible en la vista previa" }, 404);
+  return handleHost(path, init) ?? json({ message: "No disponible en la vista previa" }, 404);
+}
+
+// Rutas del Control Center (con los datos inventados de hostFixtures).
+function handleHost(path: string, init?: RequestInit): Response | null {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  let match: RegExpMatchArray | null;
+
+  if (pathname === "/auth/me" || pathname === "/host/login") return json(pathname === "/auth/me" ? DEMO_HOST : { token: "demo-host", user: DEMO_HOST });
+  if (pathname === "/auth/logout") return json({ ok: true });
+  if (pathname === "/groups") return json(GROUPS);
+  if (pathname === "/groups/members") return json(MEMBERSHIPS);
+  if (pathname === "/classes" && method === "GET") return json(CLASSES);
+  if (pathname === "/modules") return json(MODULES);
+  if (pathname === "/users") return json(USERS);
+  if (pathname === "/host/quizzes" && method === "GET") return json(QUIZZES);
+  if ((match = pathname?.match(/^\/host\/quizzes\/([^/]+)$/) ?? null) && method === "GET") {
+    const summary = QUIZZES.find((q) => q.id === match![1]);
+    if (!summary) return null;
+    return json({ id: summary.id, classId: summary.classId, title: summary.title, hasResults: summary.hasResults, questions: DEMO_QUESTIONS.map((q) => ({ ...q, id: q.id.split("#")[0] })) });
+  }
+  if ((match = pathname?.match(/^\/groups\/([^/]+)\/attendance$/) ?? null)) return json(attendanceFor(match[1] ?? ""));
+  if (pathname === "/host/results/sessions") return json(resultSessions(params.get("groupId")));
+  if ((match = pathname?.match(/^\/host\/results\/sessions\/([^/]+)$/) ?? null)) {
+    const detail = resultDetail(match[1] ?? "");
+    return detail ? json(detail) : null;
+  }
+  if ((match = pathname?.match(/^\/host\/results\/students\/([^/]+)$/) ?? null)) return json(studentHistory(match[1] ?? ""));
+  if (pathname?.match(/^\/classes\/[^/]+\/(materials|practice)(\/views)?$/)) {
+    return json(pathname.endsWith("/views") ? { students: [], views: [] } : []);
+  }
+  if (method !== "GET") return json({ message: "En la vista previa no se guardan cambios." }, 400);
+  return null;
 }
 
 export function installMockApi() {

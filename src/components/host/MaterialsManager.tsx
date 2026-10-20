@@ -210,10 +210,10 @@ function MaterialEditor({ api, classId, material, draft, onSaved, onCancel }: {
                       onChange={(e) => updateBlock(block.key, { language: e.target.value as CodeLanguage })}
                       className={`${fieldClass} mb-2 sm:max-w-xs`}
                     >
-                      <option value="python" className="text-black">Python</option>
-                      <option value="sql" className="text-black">SQL</option>
-                      <option value="bash" className="text-black">Terminal</option>
-                      <option value="text" className="text-black">Texto</option>
+                      <option value="python">Python</option>
+                      <option value="sql">SQL</option>
+                      <option value="bash">Terminal</option>
+                      <option value="text">Texto</option>
                     </select>
                     <textarea
                       value={block.code}

@@ -59,8 +59,7 @@ export default function QuizLibrary({ api }: { api: HostFetch }) {
     <section className={panelClass}>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold">Quizzes guardados</h2>
-          <p className="text-sm text-slate-400">Para crear uno nuevo, usa “Nueva sesión” → “Crear nuevo”.</p>
+          <p className="text-sm text-slate-400">Para crear uno nuevo, ve a <b className="text-slate-200">Sesión</b> → “Crear nuevo”.</p>
         </div>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className={`${fieldClass} md:max-w-xs`} />
       </div>

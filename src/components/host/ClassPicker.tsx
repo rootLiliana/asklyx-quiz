@@ -14,9 +14,9 @@ export default function ClassPicker({ groups, selection }: ClassPickerProps) {
       <div>
         <label className={labelClass}>Grupo</label>
         <select value={selection.groupId} onChange={(e) => selection.setGroupId(e.target.value)} className={fieldClass}>
-          {groups.length === 0 && <option value="" className="text-black">No hay grupos</option>}
+          {groups.length === 0 && <option value="">No hay grupos</option>}
           {groups.map((group) => (
-            <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+            <option key={group.id} value={group.id}>{group.name}</option>
           ))}
         </select>
       </div>
@@ -25,10 +25,10 @@ export default function ClassPicker({ groups, selection }: ClassPickerProps) {
         <label className={labelClass}>Clase</label>
         <select value={selection.classId} onChange={(e) => selection.setClassId(e.target.value)} className={fieldClass}>
           {selection.classesOfGroup.length === 0 && (
-            <option value="" className="text-black">Este grupo no tiene clases</option>
+            <option value="">Este grupo no tiene clases</option>
           )}
           {selection.classesOfGroup.map((classItem) => (
-            <option key={classItem.id} value={classItem.id} className="text-black">
+            <option key={classItem.id} value={classItem.id}>
               {formatClassDate(classItem.classDate)} — {classItem.name}
             </option>
           ))}

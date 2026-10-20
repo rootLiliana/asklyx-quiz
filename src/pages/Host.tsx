@@ -11,17 +11,26 @@ import type { Game } from "../types/Game";
 import type { HostFetch } from "../types/Host";
 import type { LoginResponse, PublicUser } from "../types/User";
 import { changePassword, PASSWORD_HINT } from "../lib/changePassword";
+import { Button, Card, Field, Icon, Owl, Screen, Wordmark, type IconName } from "../components/ui";
 
 type Tab = "session" | "classes" | "quizzes" | "attendance" | "results" | "users";
 
-const TAB_LABEL: Record<Tab, string> = {
-  session: "🎮 Sesión",
-  classes: "📅 Clases",
-  quizzes: "📚 Quizzes",
-  attendance: "✅ Asistencia",
-  results: "📊 Resultados",
-  users: "👥 Usuarias",
+const TAB_META: Record<Tab, { label: string; title: string; description: string; icon: IconName }> = {
+  session: { label: "Sesión", title: "Sesión en vivo", description: "Elige la clase y el quiz, y lanza el juego.", icon: "play" },
+  classes: { label: "Clases", title: "Clases", description: "Calendario de sesiones de cada grupo, con su material y su práctica.", icon: "calendar" },
+  quizzes: { label: "Quizzes", title: "Quizzes", description: "Tus quizzes guardados. Ábrelos para editarlos o duplicarlos.", icon: "book" },
+  attendance: { label: "Asistencia", title: "Asistencia", description: "Quién vino a cada clase del grupo.", icon: "check" },
+  results: { label: "Resultados", title: "Resultados", description: "Cómo les fue en cada quiz en vivo.", icon: "chart" },
+  users: { label: "Usuarias", title: "Usuarias", description: "Cuentas, grupos y restablecimiento de contraseñas.", icon: "users" },
 };
+
+// Apartados del menú: lo que pasa en vivo, lo que se prepara y lo que se revisa después.
+const SECTIONS: { label: string; tabs: Tab[] }[] = [
+  { label: "En vivo", tabs: ["session"] },
+  { label: "Contenido", tabs: ["classes", "quizzes"] },
+  { label: "Seguimiento", tabs: ["attendance", "results"] },
+  { label: "Comunidad", tabs: ["users"] },
+];
 
 function loadHostUser(): PublicUser | null {
   try {
@@ -158,137 +167,190 @@ export default function Host() {
 
   if (!hostToken || !hostUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md">
-          <h1 className="text-4xl font-bold mb-2">Host Lilihoot</h1>
-          <p className="text-slate-400 text-sm mb-6">Entra con tu cuenta de Lilihoot.</p>
-          <input
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="Nickname o correo"
-            autoCapitalize="none"
-            autoCorrect="off"
-            className="w-full mb-3 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400"
-          />
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") void loginHost(); }}
-            placeholder="Contraseña"
-            type="password"
-            className="w-full mb-2 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400"
-          />
-          <p className="mb-4 text-xs text-slate-400">{PASSWORD_HINT}</p>
-          <button onClick={loginHost} disabled={loggingIn} className="w-full p-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 font-bold disabled:opacity-50">
-            {loggingIn ? "Entrando..." : "Entrar"}
-          </button>
-          {loginError && <p className="mt-4 text-red-300">{loginError}</p>}
-          <p className="mt-6 text-center text-sm text-slate-400">
+      <Screen center>
+        <Card initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid w-full max-w-md gap-5 p-7 sm:p-8">
+          <div className="grid justify-items-center gap-2 text-center">
+            <Owl className="size-16" />
+            <h1 className="m-0 text-3xl">
+              <Wordmark className="text-4xl" /> <span className="text-slate-300">Control Center</span>
+            </h1>
+            <p className="m-0 text-sm text-slate-400">Entra con tu cuenta de host o administradora.</p>
+          </div>
+          <form
+            className="grid gap-4"
+            onSubmit={(e) => { e.preventDefault(); void loginHost(); }}
+          >
+            <Field label="Nickname o correo" value={nickname} onChange={(e) => setNickname(e.target.value)} autoCapitalize="none" autoCorrect="off" autoComplete="username" />
+            <Field label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" hint={PASSWORD_HINT} error={loginError || undefined} />
+            <Button type="submit" size="lg" block loading={loggingIn}>
+              {loggingIn ? "Entrando…" : "Entrar"}
+            </Button>
+          </form>
+          <p className="m-0 text-center text-sm text-slate-400">
             ¿Olvidaste tu contraseña? Pídele a la administradora que te ayude a restablecerla.
           </p>
-        </div>
-      </div>
+        </Card>
+      </Screen>
     );
   }
 
   if (hostUser.mustChangePassword) {
-    const fieldClass = "w-full mb-3 rounded-xl bg-white/10 border border-white/20 p-3 text-white placeholder:text-slate-400";
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md">
-          <h1 className="text-3xl font-bold mb-2">🔑 Elige tu nueva contraseña</h1>
-          <p className="text-slate-300 text-sm mb-6">
-            Entraste con una contraseña temporal. Antes de usar el panel, crea una que sí recuerdes.
-          </p>
-          {!knowsCurrent && (
-            <input
+      <Screen center>
+        <Card initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid w-full max-w-md gap-5 p-7 sm:p-8">
+          <div>
+            <h1 className="m-0 text-3xl">Elige tu nueva contraseña</h1>
+            <p className="m-0 mt-1 text-sm text-slate-300">
+              Entraste con una contraseña temporal. Antes de usar el panel, crea una que sí recuerdes.
+            </p>
+          </div>
+          <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); void saveNewPassword(); }}>
+            {!knowsCurrent && (
+              <Field
+                label="Contraseña temporal"
+                type="password"
+                value={changeForm.current}
+                onChange={(e) => setChangeForm((current) => ({ ...current, current: e.target.value }))}
+                autoComplete="current-password"
+              />
+            )}
+            <Field
+              label="Contraseña nueva"
               type="password"
-              placeholder="Contraseña temporal"
-              value={changeForm.current}
-              onChange={(e) => setChangeForm((current) => ({ ...current, current: e.target.value }))}
-              className={fieldClass}
+              value={changeForm.next}
+              onChange={(e) => setChangeForm((current) => ({ ...current, next: e.target.value }))}
+              autoComplete="new-password"
             />
-          )}
-          <input
-            type="password"
-            placeholder="Contraseña nueva"
-            value={changeForm.next}
-            onChange={(e) => setChangeForm((current) => ({ ...current, next: e.target.value }))}
-            className={fieldClass}
-          />
-          <input
-            type="password"
-            placeholder="Confirmar contraseña nueva"
-            value={changeForm.confirm}
-            onChange={(e) => setChangeForm((current) => ({ ...current, confirm: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === "Enter") void saveNewPassword(); }}
-            className={fieldClass}
-          />
-          <p className="mb-4 text-xs text-slate-400">{PASSWORD_HINT}</p>
-          <button onClick={saveNewPassword} disabled={changing} className="w-full p-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 font-bold disabled:opacity-50">
-            {changing ? "Guardando..." : "Guardar y continuar"}
-          </button>
-          {changeError && <p className="mt-4 text-red-300">{changeError}</p>}
-          <button onClick={logout} className="mt-4 w-full text-sm text-slate-400 hover:text-white">Salir</button>
-        </div>
-      </div>
+            <Field
+              label="Confirmar contraseña nueva"
+              type="password"
+              value={changeForm.confirm}
+              onChange={(e) => setChangeForm((current) => ({ ...current, confirm: e.target.value }))}
+              autoComplete="new-password"
+              hint={PASSWORD_HINT}
+              error={changeError || undefined}
+            />
+            <Button type="submit" size="lg" block loading={changing}>
+              {changing ? "Guardando…" : "Guardar y continuar"}
+            </Button>
+          </form>
+          <Button variant="ghost" size="sm" onClick={logout}>Salir</Button>
+        </Card>
+      </Screen>
     );
   }
 
   const isAdmin = hostUser.role === "ADMIN";
-  const tabs: Tab[] = ["session", "classes", "quizzes", "attendance", "results", "users"];
+  const meta = TAB_META[tab];
+  const section = SECTIONS.find((item) => item.tabs.includes(tab));
+  const roleChip = (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${isAdmin ? "bg-yellow-400/20 text-yellow-200" : "bg-fuchsia-500/25 text-fuchsia-200"}`}>
+      {isAdmin ? "Admin" : "Host"}
+    </span>
+  );
+
+  const tabButton = (item: Tab, compact: boolean) => {
+    const active = tab === item;
+    return (
+      <button
+        key={item}
+        type="button"
+        onClick={() => setTab(item)}
+        aria-current={active ? "page" : undefined}
+        className={`flex shrink-0 items-center gap-2.5 rounded-xl font-semibold transition ${compact ? "px-3.5 py-2 text-sm" : "w-full px-3 py-2.5 text-left"} ${
+          active ? "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white shadow-glow" : "text-slate-300 hover:bg-white/10 hover:text-white"
+        }`}
+      >
+        <Icon name={TAB_META[item].icon} className="size-5 shrink-0" />
+        <span>{TAB_META[item].label}</span>
+        {item === "session" && liveGame && (
+          <span className="ml-auto flex items-center gap-1 text-xs font-bold text-emerald-300">
+            <span className="size-2 animate-pulse rounded-full bg-emerald-400" /> en vivo
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-black text-white p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold">🎮 Lilihoot Control Center</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-300">
-              {hostUser.nickname}
-              <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${isAdmin ? "bg-yellow-500/20 text-yellow-200" : "bg-fuchsia-500/20 text-fuchsia-200"}`}>
-                {isAdmin ? "Admin" : "Host"}
-              </span>
-            </span>
-            <button onClick={logout} className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-3">
-              Salir
-            </button>
+    <Screen>
+      <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
+        {/* Menú lateral (computadora) */}
+        <aside className="hidden self-start lg:sticky lg:top-6 lg:block">
+          <Card className="grid gap-6 p-4">
+            <div className="flex items-center gap-2.5 px-1">
+              <Owl className="size-11" />
+              <div className="leading-tight">
+                <Wordmark className="text-2xl" />
+                <p className="m-0 text-xs font-bold uppercase tracking-wider text-slate-400">Control Center</p>
+              </div>
+            </div>
+            <nav className="grid gap-4" aria-label="Secciones del panel">
+              {SECTIONS.map((group) => (
+                <div key={group.label} className="grid gap-1">
+                  <p className="m-0 px-3 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">{group.label}</p>
+                  {group.tabs.map((item) => tabButton(item, false))}
+                </div>
+              ))}
+            </nav>
+            <div className="grid gap-2 border-t border-white/10 pt-4">
+              <p className="m-0 flex items-center gap-2 px-1 text-sm text-slate-300">
+                <span className="truncate">{hostUser.nickname}</span> {roleChip}
+              </p>
+              <Button variant="ghost" size="sm" onClick={logout} className="justify-start">
+                <Icon name="logout" className="size-4" /> Salir
+              </Button>
+            </div>
+          </Card>
+        </aside>
+
+        {/* Encabezado y menú en una fila (celular y tablet) */}
+        <div className="grid gap-3 lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Owl className="size-9" />
+              <Wordmark className="text-2xl" />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <span className="hidden truncate sm:inline">{hostUser.nickname}</span> {roleChip}
+              <Button variant="ghost" size="sm" onClick={logout} aria-label="Salir">
+                <Icon name="logout" className="size-4" />
+              </Button>
+            </div>
           </div>
+          <nav className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1" aria-label="Secciones del panel">
+            {SECTIONS.flatMap((group) => group.tabs).map((item) => tabButton(item, true))}
+          </nav>
         </div>
 
-        <nav className="flex flex-wrap gap-2 mb-6">
-          {tabs.map((item) => (
-            <button
-              key={item}
-              onClick={() => setTab(item)}
-              className={`rounded-xl px-4 py-2 font-semibold transition ${tab === item ? "bg-fuchsia-600" : "bg-white/10 hover:bg-white/20"}`}
-            >
-              {TAB_LABEL[item]}
-              {item === "session" && liveGame && <span className="ml-2 text-xs text-emerald-300">● en vivo</span>}
-            </button>
-          ))}
-        </nav>
+        <main className="grid min-w-0 content-start gap-5">
+          <header key={tab} className="grid gap-1">
+            <p className="m-0 text-xs font-extrabold uppercase tracking-wider text-fuchsia-300">{section?.label}</p>
+            <h1 className="m-0 text-3xl sm:text-4xl">{meta.title}</h1>
+            <p className="m-0 text-slate-400">{meta.description}</p>
+          </header>
 
-        {/* LiveGame se mantiene montado al cambiar de pestaña para no perder el juego. */}
-        <div className={tab === "session" ? "" : "hidden"}>
-          {liveGame ? (
-            <LiveGame
-              key={liveGame.game.code}
-              api={api}
-              initialGame={liveGame.game}
-              info={liveGame.info}
-              onExit={() => setLiveGame(null)}
-            />
-          ) : (
-            <SessionWizard key={classesVersion} api={api} onGameCreated={(game, info) => setLiveGame({ game, info })} />
-          )}
-        </div>
-        {tab === "classes" && <ClassesPanel api={api} onChanged={() => setClassesVersion((current) => current + 1)} />}
-        {tab === "quizzes" && <QuizLibrary api={api} />}
-        {tab === "attendance" && <AttendancePanel api={api} canEdit={isAdmin} />}
-        {tab === "results" && <ResultsPanel api={api} />}
-        {tab === "users" && <UsersPanel api={api} canEdit={isAdmin} />}
+          {/* LiveGame se mantiene montado al cambiar de pestaña para no perder el juego. */}
+          <div className={tab === "session" ? "" : "hidden"}>
+            {liveGame ? (
+              <LiveGame
+                key={liveGame.game.code}
+                api={api}
+                initialGame={liveGame.game}
+                info={liveGame.info}
+                onExit={() => setLiveGame(null)}
+              />
+            ) : (
+              <SessionWizard key={classesVersion} api={api} onGameCreated={(game, info) => setLiveGame({ game, info })} />
+            )}
+          </div>
+          {tab === "classes" && <ClassesPanel api={api} onChanged={() => setClassesVersion((current) => current + 1)} />}
+          {tab === "quizzes" && <QuizLibrary api={api} />}
+          {tab === "attendance" && <AttendancePanel api={api} canEdit={isAdmin} />}
+          {tab === "results" && <ResultsPanel api={api} />}
+          {tab === "users" && <UsersPanel api={api} canEdit={isAdmin} />}
+        </main>
       </div>
-    </div>
+    </Screen>
   );
 }

@@ -44,6 +44,14 @@
     color: white;
     -webkit-font-smoothing: antialiased;
   }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+  select option {
+    background-color: var(--color-slate-900);
+    color: white;
+  }
   ::selection {
     background: rgb(217 70 239 / 0.45);
   }

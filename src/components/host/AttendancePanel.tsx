@@ -114,11 +114,10 @@ export default function AttendancePanel({ api, canEdit }: AttendancePanelProps) 
       <section className={panelClass}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0 flex-1 md:max-w-sm">
-            <h2 className="text-2xl font-bold mb-4">Asistencia</h2>
             <label className={labelClass}>Grupo</label>
             <select value={groupId} onChange={(e) => setGroupChoice(e.target.value)} className={fieldClass}>
               {catalog.groups.map((group) => (
-                <option key={group.id} value={group.id} className="text-black">{group.name}</option>
+                <option key={group.id} value={group.id}>{group.name}</option>
               ))}
             </select>
           </div>

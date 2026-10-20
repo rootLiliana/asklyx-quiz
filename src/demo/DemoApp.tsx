@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { AppRoutes } from "../App";
 import { DEMO_QUESTIONS, demo, type DemoPhase } from "./mockApi";
+import { DEMO_HOST } from "./hostFixtures";
 
 // Vista previa con datos de ejemplo: las rutas reales de la app más un panel
 // flotante para saltar entre pantallas y estados del juego.
@@ -27,6 +28,16 @@ function DemoPanel() {
   useEffect(() => {
     if (location.pathname === "/quiz" && phase === "finished") navigate("/podium");
   }, [location.pathname, phase, navigate]);
+
+  const goHost = () => {
+    try {
+      localStorage.setItem("hostToken", "demo-host");
+      localStorage.setItem("hostUser", JSON.stringify(DEMO_HOST));
+    } catch {
+      // sin almacenamiento: se verá la pantalla de entrada del panel
+    }
+    navigate("/host");
+  };
 
   const goQuiz = (next: () => void) => {
     next();
@@ -65,10 +76,11 @@ function DemoPanel() {
         <div className="flex flex-wrap gap-1.5">
           <button type="button" className={chip(location.pathname === "/")} onClick={() => navigate("/")}>Inicio</button>
           <button type="button" className={chip(location.pathname === "/quiz")} onClick={() => navigate("/quiz")}>Quiz de la alumna</button>
+          <button type="button" className={chip(location.pathname === "/host")} onClick={goHost}>Control Center</button>
         </div>
       </div>
 
-      <div className="grid gap-1.5">
+      {location.pathname !== "/host" && <div className="grid gap-1.5">
         <span className="text-xs font-bold text-slate-400">Estado del juego</span>
         <div className="flex flex-wrap gap-1.5">
           <button type="button" className={chip(phase === "waiting")} onClick={() => goQuiz(() => demo.setPhase("waiting"))}>Esperando</button>
@@ -81,10 +93,12 @@ function DemoPanel() {
         <button type="button" className={chip(false)} onClick={() => goQuiz(() => demo.restartQuestion())} disabled={phase !== "question"}>
           ↺ Repetir esta pregunta
         </button>
-      </div>
+      </div>}
 
       <p className="m-0 text-xs leading-relaxed text-slate-400">
-        Toca una opción para contestar. Las demás pantallas todavía tienen el diseño anterior.
+        {location.pathname === "/host"
+          ? "Datos inventados. Puedes navegar y abrir detalles; los cambios no se guardan. La vista del juego en vivo es la siguiente fase."
+          : "Toca una opción para contestar. Las pantallas que no están en este panel todavía tienen el diseño anterior."}
       </p>
     </aside>
   );
