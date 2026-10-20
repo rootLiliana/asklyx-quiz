@@ -246,10 +246,19 @@ export default function Quiz() {
                   <p className="m-0 mt-1 text-slate-200">{verdict.text}</p>
                 </div>
                 {result && (
-                  <div className="grid gap-1 border-t border-white/10 pt-3">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Respuesta correcta</span>
-                    <p className="m-0 text-xl font-bold text-green-300 break-words">{question.options[result.correctAnswer]}</p>
-                    {result.explanation && <p className="m-0 leading-relaxed text-slate-200">{result.explanation}</p>}
+                  <div className="grid gap-3 border-t border-white/10 pt-3">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <AnswerTag label="Respuesta correcta" text={question.options[result.correctAnswer] ?? ""} tone="good" />
+                      {chosen !== null && chosen !== result.correctAnswer && !result.alreadyAnswered && (
+                        <AnswerTag label="Tu respuesta" text={question.options[chosen] ?? ""} tone="bad" />
+                      )}
+                    </div>
+                    {result.explanation && (
+                      <div className="grid gap-1 rounded-xl bg-white/5 p-3.5">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-fuchsia-300">¿Por qué?</span>
+                        <p className="m-0 leading-relaxed text-slate-100">{result.explanation}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
@@ -258,5 +267,17 @@ export default function Quiz() {
         </AnimatePresence>
       </motion.main>
     </Screen>
+  );
+}
+
+function AnswerTag({ label, text, tone }: { label: string; text: string; tone: "good" | "bad" }) {
+  return (
+    <div className={`grid gap-0.5 rounded-xl border px-3.5 py-2.5 ${tone === "good" ? "border-green-300/40 bg-green-500/10" : "border-red-400/40 bg-red-500/10"}`}>
+      <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className={`text-lg font-bold break-words ${tone === "good" ? "text-green-300" : "text-red-300"}`}>
+        {tone === "good" ? "✓ " : "✗ "}
+        {text}
+      </span>
+    </div>
   );
 }

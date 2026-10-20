@@ -20,21 +20,21 @@ export const DEMO_QUESTIONS: DemoQuestion[] = [
     text: "¿Qué JOIN muestra a todas las alumnas, aunque no tengan taller?",
     options: ["INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "JOIN sin ON"],
     correctAnswer: 1,
-    explanation: "LEFT JOIN muestra toda la tabla de la izquierda; Valeria sale con taller NULL.",
+    explanation: "LEFT JOIN trae todas las filas de la tabla que va en el FROM (la izquierda), tengan pareja o no. Por eso Valeria aparece aunque no tenga taller: esa columna le sale en NULL. Con INNER JOIN, en cambio, se quedaría fuera.",
   },
   {
     id: "q2",
     text: "¿Qué regresa (SELECT AVG(calificacion) FROM alumnas)?",
     options: ["Una lista de calificaciones", "Un solo número", "Los nombres de las alumnas", "Un error"],
     correctAnswer: 1,
-    explanation: "AVG calcula el promedio: la subconsulta se convierte en un solo número (8.5).",
+    explanation: "AVG suma las calificaciones y divide entre cuántas son: (9 + 7 + 10 + 8) / 4 = 8.5. Toda la subconsulta se convierte en ese solo número, que después puedes usar para comparar en un WHERE.",
   },
   {
     id: "q3",
     text: "Una celda dice “Robótica, Diseño web”. ¿Qué forma normal no se cumple?",
     options: ["1FN", "2FN", "3FN", "Las cumple todas"],
     correctAnswer: 0,
-    explanation: "La 1FN pide un solo valor por celda: cada taller va en su propia fila.",
+    explanation: "La 1FN pide un solo valor por celda. Con dos talleres juntos no puedes buscar fácil quién está en Diseño web, porque el dato está escondido dentro de un texto. La solución es una fila por cada taller.",
   },
 ];
 
