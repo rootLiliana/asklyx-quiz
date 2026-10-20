@@ -28,3 +28,4 @@ server/.env
 *.sln
 *.sw?
 migrations/
+dist-demo

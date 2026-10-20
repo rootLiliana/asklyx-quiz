@@ -23,32 +23,30 @@ function Loading() {
   );
 }
 
+// Las rutas van aparte para que la vista previa (src/demo) las use con otro router.
+export function AppRoutes() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/host" element={<Host />} />
+        <Route path="/join" element={<Join />} />
+        <Route path="/quiz" element={<Quiz />} />
+        <Route path="/icebreaker" element={<IceBreaker />} />
+        <Route path="/podium" element={<Podium />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/mis-resultados" element={<MyResults />} />
+        <Route path="/mi-grupo" element={<MyGroup />} />
+        <Route path="/practica/:quizId" element={<Practice />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <Suspense fallback={<Loading />}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-
-          <Route path="/host" element={<Host />} />
-
-          <Route path="/join" element={<Join />} />
-
-          <Route path="/quiz" element={<Quiz />} />
-
-          <Route path="/icebreaker" element={<IceBreaker />} />
-
-          <Route path="/podium" element={<Podium />} />
-
-          <Route path="/reset-password" element={<ResetPassword />} />
-
-          <Route path="/mis-resultados" element={<MyResults />} />
-
-          <Route path="/mi-grupo" element={<MyGroup />} />
-
-          <Route path="/practica/:quizId" element={<Practice />} />
-        </Routes>
-      </Suspense>
+      <AppRoutes />
     </BrowserRouter>
   );
 }
