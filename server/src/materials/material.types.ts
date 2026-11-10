@@ -7,7 +7,10 @@ export type MaterialBlock =
   // listas con "- " o "1. ".
   | { type: "text"; text: string }
   | { type: "code"; language: CodeLanguage; code: string }
-  | { type: "link"; url: string; label: string };
+  | { type: "link"; url: string; label: string }
+  // Página HTML completa (material interactivo). Se muestra en un iframe
+  // aislado (sandbox sin allow-same-origin): no puede tocar la sesión de la app.
+  | { type: "html"; html: string; fileName: string };
 
 // El material es de la sesión (lesson): lo ven todos los grupos que la tienen.
 export interface Material {

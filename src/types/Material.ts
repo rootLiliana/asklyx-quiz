@@ -4,7 +4,9 @@ export type CodeLanguage = "python" | "sql" | "bash" | "text";
 export type MaterialBlock =
   | { type: "text"; text: string }
   | { type: "code"; language: CodeLanguage; code: string }
-  | { type: "link"; url: string; label: string };
+  | { type: "link"; url: string; label: string }
+  // Página HTML interactiva completa; se muestra en un iframe aislado.
+  | { type: "html"; html: string; fileName: string };
 
 export interface Material {
   id: string;

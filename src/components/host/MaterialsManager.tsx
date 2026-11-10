@@ -4,11 +4,54 @@ import type { ClassSummary, HostFetch } from "../../types/Host";
 import type { CodeLanguage, Material, MaterialBlock, MaterialViewReport } from "../../types/Material";
 import MaterialView from "../material/MaterialView";
 import { initialScheduledAt, publishModeOf, resolvePublishedAt, scheduleProblem, type PublishMode } from "../../lib/publishing";
+import { formatKb, readHtmlFile } from "../../lib/htmlMaterial";
 import PracticeManager from "./PracticeManager";
 import { PublishPicker, StatusBadge } from "./Publishing";
 
 // Bloque en edición: `key` estable para React aunque se reordenen.
 type EditableBlock = MaterialBlock & { key: string };
+
+const BLOCK_LABELS: Record<MaterialBlock["type"], string> = {
+  text: "📝 Texto",
+  code: "💻 Código",
+  link: "🔗 Enlace",
+  html: "🧩 HTML interactivo",
+};
+
+// Material nuevo que ya trae contenido (p. ej. al subir un HTML desde la lista).
+export type MaterialDraft = { title: string; blocks: MaterialBlock[] };
+
+// Elige un .html y lo entrega leído; los errores se muestran junto al botón.
+function HtmlFileButton({ label, onLoaded, className }: {
+  label: string;
+  onLoaded: (file: { html: string; fileName: string; title: string }) => void;
+  className: string;
+}) {
+  const [error, setError] = useState("");
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <label className={`cursor-pointer ${className}`}>
+        {label}
+        <input
+          type="file"
+          accept=".html,.htm,text/html"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = ""; // permite volver a elegir el mismo archivo
+            if (!file) return;
+            const result = await readHtmlFile(file);
+            if (typeof result === "string") { setError(result); return; }
+            setError("");
+            onLoaded(result);
+          }}
+        />
+      </label>
+      {error && <span className="text-sm text-red-300">{error}</span>}
+    </span>
+  );
+}
 
 const TEXT_HELP = "# Título · ## Subtítulo · **negritas** · *cursiva* · `código` · líneas con - o 1. para listas";
 
@@ -16,6 +59,7 @@ function newBlock(type: MaterialBlock["type"]): EditableBlock {
   const key = crypto.randomUUID();
   if (type === "text") return { key, type, text: "" };
   if (type === "code") return { key, type, language: "python", code: "" };
+  if (type === "html") return { key, type, html: "", fileName: "" };
   return { key, type, url: "", label: "" };
 }
 
@@ -23,6 +67,7 @@ function newBlock(type: MaterialBlock["type"]): EditableBlock {
 function toBlock(block: EditableBlock): MaterialBlock {
   if (block.type === "text") return { type: "text", text: block.text };
   if (block.type === "code") return { type: "code", language: block.language, code: block.code };
+  if (block.type === "html") return { type: "html", html: block.html, fileName: block.fileName };
   return { type: "link", url: block.url.trim(), label: block.label.trim() };
 }
 
@@ -34,20 +79,23 @@ function validate(title: string, blocks: EditableBlock[], mode: PublishMode, sch
     if (block.type === "text" && !block.text.trim()) return `${where}: escribe el texto o quita el bloque.`;
     if (block.type === "code" && !block.code.trim()) return `${where}: escribe el código o quita el bloque.`;
     if (block.type === "link" && !/^https?:\/\/\S+$/i.test(block.url.trim())) return `${where}: el enlace debe empezar con https://`;
+    if (block.type === "html" && !block.html.trim()) return `${where}: sube el archivo HTML o quita el bloque.`;
   }
   return scheduleProblem(mode, scheduledAt);
 }
 
-function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
+function MaterialEditor({ api, classId, material, draft, onSaved, onCancel }: {
   api: HostFetch;
   classId: string;
   material: Material | null;
+  draft?: MaterialDraft;
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(material?.title ?? "");
+  const initial = material ?? draft;
+  const [title, setTitle] = useState(initial?.title ?? "");
   const [blocks, setBlocks] = useState<EditableBlock[]>(() =>
-    material ? material.blocks.map((block) => ({ ...block, key: crypto.randomUUID() })) : [newBlock("text")],
+    initial ? initial.blocks.map((block) => ({ ...block, key: crypto.randomUUID() })) : [newBlock("text")],
   );
   const [mode, setMode] = useState<PublishMode>(() => publishModeOf(material?.publishedAt ?? null));
   const [scheduledAt, setScheduledAt] = useState(() => initialScheduledAt(material?.publishedAt ?? null));
@@ -122,7 +170,7 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
       {preview ? (
         <div className="rounded-2xl bg-black/20 p-4 sm:p-6">
           <h3 className="text-2xl font-bold mb-5 break-words">{title || "Sin título"}</h3>
-          <MaterialView blocks={blocks} />
+          <MaterialView blocks={blocks} title={title} />
         </div>
       ) : (
         <>
@@ -134,7 +182,7 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
               <div key={block.key} className="rounded-2xl bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <span className="text-sm font-semibold text-slate-300">
-                    {block.type === "text" ? "📝 Texto" : block.type === "code" ? "💻 Código" : "🔗 Enlace"}
+                    {BLOCK_LABELS[block.type]}
                   </span>
                   <span className="flex gap-1">
                     <button onClick={() => moveBlock(index, -1)} disabled={index === 0} title="Subir" className="rounded-lg px-2 py-1 hover:bg-white/10 disabled:opacity-30">↑</button>
@@ -177,6 +225,27 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
                   </>
                 )}
 
+                {block.type === "html" && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {block.html ? (
+                      <span className="min-w-0 break-words text-sm text-slate-300">
+                        📄 {block.fileName || "página.html"} · {formatKb(block.html)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-400">Todavía no hay archivo.</span>
+                    )}
+                    <HtmlFileButton
+                      label={block.html ? "Cambiar archivo" : "Elegir archivo .html"}
+                      className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1 text-sm font-semibold"
+                      onLoaded={(file) => {
+                        updateBlock(block.key, { html: file.html, fileName: file.fileName });
+                        setTitle((current) => current.trim() ? current : file.title);
+                      }}
+                    />
+                    <p className="w-full text-xs text-slate-500">Usa "👀 Vista previa" para probarlo como lo verán las alumnas.</p>
+                  </div>
+                )}
+
                 {block.type === "link" && (
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <input
@@ -200,9 +269,9 @@ function MaterialEditor({ api, classId, material, onSaved, onCancel }: {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {(["text", "code", "link"] as const).map((type) => (
+            {(["text", "code", "link", "html"] as const).map((type) => (
               <button key={type} onClick={() => setBlocks((current) => [...current, newBlock(type)])} className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-2 text-sm font-semibold">
-                + {type === "text" ? "Texto" : type === "code" ? "Código" : "Enlace"}
+                + {BLOCK_LABELS[type].replace(/^\S+ /, "")}
               </button>
             ))}
           </div>
@@ -273,7 +342,7 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
 }) {
   const [materials, setMaterials] = useState<Material[] | null>(null);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<Material | "new" | null>(null);
+  const [editing, setEditing] = useState<Material | MaterialDraft | "new" | null>(null);
   const [version, setVersion] = useState(0);
   // Editando o viendo resultados de una práctica: se oculta el material.
   const [practiceFocused, setPracticeFocused] = useState(false);
@@ -315,10 +384,11 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
   if (editing) {
     return (
       <MaterialEditor
-        key={editing === "new" ? "new" : editing.id}
+        key={editing === "new" || !("id" in editing) ? "new" : editing.id}
         api={api}
         classId={classItem.id}
-        material={editing === "new" ? null : editing}
+        material={editing === "new" || !("id" in editing) ? null : editing}
+        draft={editing !== "new" && !("id" in editing) ? editing : undefined}
         onSaved={() => { setEditing(null); setVersion((current) => current + 1); }}
         onCancel={() => setEditing(null)}
       />
@@ -337,13 +407,20 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
           <p className="text-sm text-slate-400 break-words">{classItem.name}</p>
           <p className="text-xs text-slate-500 break-words">Lo ven: {sharedWith}</p>
         </div>
-        <button onClick={() => setEditing("new")} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-4 py-3 font-bold">+ Nuevo material</button>
+        <div className="flex flex-wrap items-start gap-2">
+          <HtmlFileButton
+            label="🧩 Subir HTML interactivo"
+            className="block rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-3 font-bold"
+            onLoaded={(file) => setEditing({ title: file.title, blocks: [{ type: "html", html: file.html, fileName: file.fileName }] })}
+          />
+          <button onClick={() => setEditing("new")} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-4 py-3 font-bold">+ Nuevo material</button>
+        </div>
       </div>
 
       {error && <p className="text-red-300 mb-3">{error}</p>}
       {!materials && !error && <p className="text-slate-400">Cargando...</p>}
       {materials?.length === 0 && (
-        <p className="text-slate-400 text-center py-8">Esta sesión todavía no tiene material. Agrega una lectura, código o enlaces para que los alumnos se preparen.</p>
+        <p className="text-slate-400 text-center py-8">Esta sesión todavía no tiene material. Agrega una lectura, código, enlaces o un HTML interactivo para que las alumnas se preparen.</p>
       )}
 
       <div className="grid grid-cols-1 gap-2">
@@ -354,6 +431,7 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <StatusBadge publishedAt={material.publishedAt} />
                 <span>{material.blocks.length} {material.blocks.length === 1 ? "bloque" : "bloques"}</span>
+                {material.blocks.some((block) => block.type === "html") && <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-indigo-200">🧩 interactivo</span>}
               </p>
             </div>
             <span className="flex gap-2">
