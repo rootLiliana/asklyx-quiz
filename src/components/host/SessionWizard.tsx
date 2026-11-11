@@ -229,7 +229,7 @@ export default function SessionWizard({ api, onGameCreated }: SessionWizardProps
         <button
           onClick={createGame}
           disabled={!selectedClass || !selectedQuiz || !durationValid || creating}
-          className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-6 py-4 font-bold text-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          className="rounded-xl bg-pearl text-fuchsia-950 hover:bg-fuchsia-300 px-6 py-4 font-bold text-lg disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {creating ? "Creando..." : "Crear juego"}
         </button>

@@ -14,23 +14,23 @@ export function Owl({ className = "size-16", blink = true }: { className?: strin
     <svg viewBox="0 0 64 64" className={className} role="img" aria-label="Lilihoot">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#E879F9" />
-          <stop offset="1" stopColor="#9333EA" />
+          <stop offset="0" stopColor="#F0A9C8" />
+          <stop offset="1" stopColor="#B9B4F5" />
         </linearGradient>
       </defs>
       {/* orejas */}
-      <path d="M14 18 L18 4 L26 14 Z" fill="#C026D3" />
-      <path d="M50 18 L46 4 L38 14 Z" fill="#C026D3" />
+      <path d="M14 18 L18 4 L26 14 Z" fill="#D98BB0" />
+      <path d="M50 18 L46 4 L38 14 Z" fill="#D98BB0" />
       {/* cuerpo */}
       <rect x="10" y="10" width="44" height="50" rx="22" fill={`url(#${gradientId})`} />
       {/* panza */}
-      <ellipse cx="32" cy="46" rx="13" ry="11" fill="#F5D0FE" opacity="0.35" />
+      <ellipse cx="32" cy="46" rx="13" ry="11" fill="#9FE3D6" opacity="0.35" />
       {/* ojos */}
       <motion.g style={{ transformBox: "fill-box", originX: 0.5, originY: 0.5 }} {...eyes}>
         <circle cx="23" cy="28" r="9" fill="#fff" />
         <circle cx="41" cy="28" r="9" fill="#fff" />
-        <circle cx="24" cy="29" r="4.5" fill="#3B0764" />
-        <circle cx="40" cy="29" r="4.5" fill="#3B0764" />
+        <circle cx="24" cy="29" r="4.5" fill="#2A1324" />
+        <circle cx="40" cy="29" r="4.5" fill="#2A1324" />
         <circle cx="25.5" cy="27.5" r="1.4" fill="#fff" />
         <circle cx="41.5" cy="27.5" r="1.4" fill="#fff" />
       </motion.g>
@@ -44,7 +44,7 @@ export function Wordmark({ className = "text-5xl" }: { className?: string }) {
   return (
     <span className={`font-display font-semibold tracking-tight ${className}`}>
       <span className="bg-gradient-to-r from-fuchsia-300 to-fuchsia-100 bg-clip-text text-transparent">Lili</span>
-      <span className="bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-400 bg-clip-text text-transparent">hoot</span>
+      <span className="pearl-text">hoot</span>
     </span>
   );
 }

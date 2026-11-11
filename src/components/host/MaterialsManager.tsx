@@ -413,7 +413,7 @@ export default function MaterialsManager({ api, classItem, sharedWith, onBack }:
             className="block rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-3 font-bold"
             onLoaded={(file) => setEditing({ title: file.title, blocks: [{ type: "html", html: file.html, fileName: file.fileName }] })}
           />
-          <button onClick={() => setEditing("new")} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-4 py-3 font-bold">+ Nuevo material</button>
+          <button onClick={() => setEditing("new")} className="rounded-xl bg-pearl text-fuchsia-950 hover:bg-fuchsia-300 px-4 py-3 font-bold">+ Nuevo material</button>
         </div>
       </div>
 

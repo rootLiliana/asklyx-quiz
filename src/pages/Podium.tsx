@@ -50,7 +50,7 @@ const PLACES: Record<1 | 2 | 3, PlaceStyle> = {
     medal: "🥇",
     label: "¡PRIMER LUGAR!",
     burst: ["🏆", "👑", "🎉", "⭐", "✨", "🥇", "💛", "🎊"],
-    pedestal: "from-yellow-300 via-amber-400 to-amber-600 shadow-[0_0_60px_rgba(251,191,36,0.55)]",
+    pedestal: "from-[#f6e3b4] via-[#d9b56a] to-[#a8823c] shadow-[0_0_60px_rgba(217,181,106,0.4)]",
     pedestalHeight: "h-36 sm:h-44 md:h-56",
     nameClass: "text-yellow-300 text-base sm:text-xl md:text-3xl font-black",
   },
@@ -60,7 +60,7 @@ const PLACES: Record<1 | 2 | 3, PlaceStyle> = {
     medal: "🥈",
     label: "¡Segundo lugar!",
     burst: ["🥈", "✨", "🎉", "💫", "🙌"],
-    pedestal: "from-slate-200 via-slate-300 to-slate-500",
+    pedestal: "from-[#f1eef6] via-[#cfc9dc] to-[#8f88a3]",
     pedestalHeight: "h-24 sm:h-32 md:h-40",
     nameClass: "text-white text-sm sm:text-lg md:text-2xl font-bold",
   },
@@ -70,7 +70,7 @@ const PLACES: Record<1 | 2 | 3, PlaceStyle> = {
     medal: "🥉",
     label: "¡Tercer lugar!",
     burst: ["🥉", "🎉", "✨", "👏", "🔥"],
-    pedestal: "from-orange-300 via-orange-400 to-orange-700",
+    pedestal: "from-[#f5cdc0] via-[#d9998a] to-[#9c5f57]",
     pedestalHeight: "h-16 sm:h-24 md:h-28",
     nameClass: "text-white text-sm sm:text-lg md:text-2xl font-bold",
   },
@@ -232,7 +232,7 @@ function PodiumColumn({ player, style, step }: { player: Player | undefined; sty
               animate={shaking ? { x: [-4, 4, -4], rotate: [-1.5, 1.5, -1.5] } : { y: [0, -5, 0] }}
               transition={shaking ? { repeat: Infinity, duration: 0.18 } : { repeat: Infinity, duration: 3, ease: "easeInOut" }}
             >
-              <Cloud className="absolute inset-0 h-full w-full drop-shadow-xl" tint={isFirst ? "#fde68a" : "#e9d5ff"} />
+              <Cloud className="absolute inset-0 h-full w-full drop-shadow-xl" tint={isFirst ? "#fde68a" : "#d3cff9"} />
               <span className="absolute inset-0 flex items-center justify-center pt-3 text-2xl sm:text-3xl font-black text-purple-900/70">
                 {style.place}
               </span>
@@ -308,9 +308,9 @@ export default function Podium() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-indigo-950 via-purple-900 to-fuchsia-900 text-white">
+    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-night-deep via-night to-fuchsia-950 text-white">
       {finale && (
-        <Confetti width={width} height={height} recycle={false} numberOfPieces={width < 640 ? 250 : 500} />
+        <Confetti width={width} height={height} recycle={false} numberOfPieces={width < 640 ? 250 : 500} colors={["#F0A9C8", "#F7C6DB", "#B9B4F5", "#9FE3D6", "#E8CE8E", "#FFFFFF"]} />
       )}
 
       {/* Estrellas de fondo */}
@@ -333,7 +333,7 @@ export default function Podium() {
             {finale ? (
               <motion.div key="finale" initial={{ scale: 0, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 140 }}>
                 <p className="m-0 text-5xl sm:text-6xl">🏆</p>
-                <h1 className="m-0 bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-400 bg-clip-text font-display text-4xl font-semibold tracking-wide text-transparent sm:text-6xl md:text-7xl">
+                <h1 className="m-0 pearl-text font-display text-4xl font-semibold tracking-wide text-transparent sm:text-6xl md:text-7xl">
                   ¡Campeonas Lilihoot!
                 </h1>
               </motion.div>
@@ -395,7 +395,7 @@ export default function Podium() {
 
         {/* Jugadores (no la host, que abre el podio con ?code=): ver su % del quiz. */}
         {!isDemo && finale && !searchParams.get("code") && localStorage.getItem("studentToken") && (
-          <a href="/mis-resultados" className="mt-10 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 px-6 py-3 font-bold shadow-glow hover:from-fuchsia-400 hover:to-purple-500">
+          <a href="/mis-resultados" className="mt-10 rounded-xl bg-pearl px-6 py-3 font-bold shadow-glow text-fuchsia-950 hover:bg-fuchsia-300">
             Ver mis resultados
           </a>
         )}
@@ -422,7 +422,7 @@ export default function Podium() {
             {Array.from({ length: 6 }, (_, i) => (
               <div key={i} className="absolute inset-x-0" style={{ top: `${i * 17 - 5}%` }}>
                 <Cloud
-                  tint="#f5d0fe"
+                  tint="#f7c6db"
                   className={`absolute w-[70%] min-w-[220px] drop-shadow-2xl ${side === "left" ? "-right-[20%]" : "-left-[20%]"}`}
                 />
               </div>

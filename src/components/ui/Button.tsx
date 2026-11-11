@@ -14,11 +14,13 @@ type ButtonProps = Omit<HTMLMotionProps<"button">, "children"> & {
 };
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white shadow-glow hover:from-fuchsia-400 hover:to-purple-500",
-  secondary: "border border-white/15 bg-white/10 text-white hover:bg-white/20",
-  gold: "bg-gradient-to-r from-yellow-400 to-amber-500 text-purple-950 shadow-glow-gold hover:from-yellow-300 hover:to-amber-400",
+  // Rosa perla sólido con texto oscuro: sobrio y con buen contraste.
+  primary: "bg-pearl text-fuchsia-950 shadow-glow hover:bg-fuchsia-300",
+  secondary: "border border-white/12 bg-white/[0.06] text-white hover:bg-white/[0.12]",
+  // Champán: el mismo oro suave del podio.
+  gold: "bg-gradient-to-r from-[#f6e3b4] to-[#d9b56a] text-fuchsia-950 shadow-glow-gold hover:from-[#faecc8] hover:to-[#e2c17e]",
   ghost: "text-white/70 hover:bg-white/10 hover:text-white",
-  danger: "bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-400 hover:to-rose-500",
+  danger: "bg-red-500/90 text-white hover:bg-red-500",
 };
 
 const SIZES: Record<ButtonSize, string> = {

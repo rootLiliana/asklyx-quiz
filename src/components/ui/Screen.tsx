@@ -8,23 +8,24 @@ interface ScreenProps {
   className?: string;
 }
 
-// Fondo de todas las pantallas: el degradado de la marca con dos luces suaves
-// que se mueven despacio. Con "reducir movimiento" las luces se quedan quietas.
+// Fondo de todas las pantallas: noche berenjena con dos luces muy tenues
+// (rosa perla y menta) que se mueven despacio. Con "reducir movimiento" se
+// quedan quietas.
 export function Screen({ children, center = false, className = "" }: ScreenProps) {
   const reduce = useReducedMotion();
 
   return (
-    <div className="relative min-h-dvh overflow-clip bg-gradient-to-br from-purple-900 via-indigo-900 to-black text-white">
+    <div className="relative min-h-dvh overflow-clip bg-gradient-to-b from-night via-night to-night-deep text-white">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <motion.div
-          className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-fuchsia-500/25 blur-3xl"
+          className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-pearl/10 blur-3xl"
           animate={reduce ? undefined : { x: [0, 60, 0], y: [0, 40, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
-          className="absolute -bottom-40 -right-24 size-[32rem] rounded-full bg-indigo-500/20 blur-3xl"
+          className="absolute -bottom-40 -right-24 size-[32rem] rounded-full bg-mint/[0.06] blur-3xl"
           animate={reduce ? undefined : { x: [0, -50, 0], y: [0, -30, 0] }}
-          transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 

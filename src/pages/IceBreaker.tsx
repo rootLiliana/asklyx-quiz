@@ -87,7 +87,7 @@ export default function IceBreakerPage() {
           <div className="text-center text-white space-y-4">
             <p className="text-6xl">🔌</p>
             <h2 className="text-2xl font-bold">Este juego ya no está disponible</h2>
-            <button onClick={() => navigate("/join")} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-6 py-3 font-bold">
+            <button onClick={() => navigate("/join")} className="rounded-xl bg-pearl text-fuchsia-950 hover:bg-fuchsia-300 px-6 py-3 font-bold">
               Volver a entrar
             </button>
           </div>
@@ -118,7 +118,7 @@ export default function IceBreakerPage() {
                 <button
                   onClick={() => void submitAnswer()}
                   disabled={!answer.trim() || sending}
-                  className="mt-6 w-full rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 transition-all text-white font-bold p-4 text-lg disabled:opacity-50"
+                  className="mt-6 w-full rounded-xl bg-pearl text-fuchsia-950 hover:bg-fuchsia-300 transition-all font-bold p-4 text-lg disabled:opacity-50"
                 >
                   {sending ? "Enviando..." : "Enviar Respuesta"}
                 </button>

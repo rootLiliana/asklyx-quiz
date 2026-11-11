@@ -269,7 +269,7 @@ export default function UsersPanel({ api, canEdit }: { api: HostFetch; canEdit: 
                     </button>
                   )}
                   {canEdit && user.role === "STUDENT" && (
-                    <button onClick={() => void changeRole(user, "HOST")} disabled={savingUserId === user.id} className="rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 px-3 py-1 disabled:opacity-50">
+                    <button onClick={() => void changeRole(user, "HOST")} disabled={savingUserId === user.id} className="rounded-lg bg-pearl text-fuchsia-950 hover:bg-fuchsia-300 px-3 py-1 disabled:opacity-50">
                       Hacer Host
                     </button>
                   )}

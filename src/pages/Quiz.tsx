@@ -157,11 +157,11 @@ export default function Quiz() {
   const locked = Boolean(result) || sending || timeIsUp;
 
   const optionClass = (index: number) => {
-    if (result && index === result.correctAnswer) return "from-green-500 to-emerald-600 ring-4 ring-green-300 shadow-glow-green";
-    if (result && index === chosen) return "from-red-500 to-rose-600";
-    if (index === chosen && sending) return "from-fuchsia-400 to-purple-500 ring-4 ring-fuchsia-200";
-    if (locked) return "from-fuchsia-500/40 to-purple-600/40 text-white/70";
-    return "from-fuchsia-500 to-purple-600 shadow-glow hover:from-fuchsia-400 hover:to-purple-500";
+    if (result && index === result.correctAnswer) return "from-emerald-500/35 to-mint/20 ring-2 ring-mint text-white";
+    if (result && index === chosen) return "from-red-500/35 to-rose-500/20 ring-2 ring-red-400/80";
+    if (index === chosen && sending) return "from-pearl/30 to-lilac/20 ring-2 ring-pearl shadow-glow";
+    if (locked) return "from-white/[0.04] to-white/[0.02] ring-1 ring-white/5 text-white/60";
+    return "from-white/[0.07] to-white/[0.03] ring-1 ring-white/10 hover:ring-pearl/70 hover:from-white/[0.11]";
   };
 
   const verdict = result
@@ -185,7 +185,7 @@ export default function Quiz() {
           recycle={false}
           numberOfPieces={160}
           gravity={0.25}
-          colors={["#D946EF", "#F0ABFC", "#FACC15", "#FCD34D", "#22C55E"]}
+          colors={["#F0A9C8", "#F7C6DB", "#B9B4F5", "#9FE3D6", "#E8CE8E"]}
           className="pointer-events-none !fixed inset-0"
         />
       )}
@@ -221,7 +221,7 @@ export default function Quiz() {
               onClick={() => void submitAnswer(index)}
               className={`flex min-h-20 items-center gap-4 rounded-2xl bg-gradient-to-r p-4 text-left text-lg font-bold break-words transition disabled:cursor-default sm:p-5 sm:text-xl ${optionClass(index)}`}
             >
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/20 font-display text-xl">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-pearl/15 font-display text-xl text-fuchsia-200">
                 {result && index === result.correctAnswer ? "✓" : LETTERS[index] ?? index + 1}
               </span>
               <span className="min-w-0">{option}</span>

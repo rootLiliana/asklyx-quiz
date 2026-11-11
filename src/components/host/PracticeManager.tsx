@@ -597,7 +597,7 @@ export default function PracticeManager({ api, classId, onViewChange }: {
           <h2 className="text-2xl font-bold">✏️ Quizzes de práctica</h2>
           <p className="text-sm text-slate-400">Ejercicios para que practiquen solos antes o después de la clase.</p>
         </div>
-        <button onClick={() => setView({ kind: "edit", quizId: null })} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-4 py-3 font-bold">+ Nueva práctica</button>
+        <button onClick={() => setView({ kind: "edit", quizId: null })} className="rounded-xl bg-pearl text-fuchsia-950 hover:bg-fuchsia-300 px-4 py-3 font-bold">+ Nueva práctica</button>
       </div>
 
       {error && <p className="text-red-300 mb-3">{error}</p>}

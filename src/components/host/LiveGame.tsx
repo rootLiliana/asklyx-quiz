@@ -408,7 +408,7 @@ function Lobby({ joinUrl, gameCode, players, questionCount, onStart, onIcebreake
         <div className="grid justify-items-center gap-2 text-center">
           <motion.p
             key={players}
-            initial={reduce ? false : { scale: 1.5, color: "#F0ABFC" }}
+            initial={reduce ? false : { scale: 1.5, color: "#F0A9C8" }}
             animate={{ scale: 1, color: "#FFFFFF" }}
             transition={{ type: "spring", stiffness: 260, damping: 14 }}
             className="m-0 font-display text-8xl font-semibold tabular-nums"
@@ -447,7 +447,7 @@ function AnsweredMeter({ answered, total }: { answered: number; total: number })
   return (
     <div className="flex min-w-48 items-center gap-3" aria-live="polite">
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
-        <motion.div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-purple-500" animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
+        <motion.div className="h-full rounded-full bg-gradient-to-r from-pearl via-lilac to-mint" animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
       </div>
       <span className="text-sm font-bold tabular-nums text-slate-200">
         {answered} de {total} respondieron
@@ -471,9 +471,9 @@ function OptionsBoard({ question, revealed }: { question: Game["questions"][numb
         const count = counts[index] ?? 0;
         const pct = total > 0 ? Math.round((count / total) * 100) : 0;
         const tone = !revealed
-          ? "from-fuchsia-500 to-purple-600"
+          ? "from-white/[0.07] to-white/[0.03] ring-1 ring-white/10"
           : correct
-            ? "from-green-500 to-emerald-600 ring-4 ring-green-300"
+            ? "from-emerald-500/35 to-mint/20 ring-2 ring-mint"
             : "from-white/10 to-white/5";
 
         return (
@@ -545,7 +545,7 @@ function RankingBoard({ ranking, limit = 5, showGained = true }: { ranking: Rank
         >
           <motion.div
             aria-hidden="true"
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-fuchsia-500/30 to-purple-600/20"
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-pearl/25 to-lilac/10"
             initial={{ width: 0 }}
             animate={{ width: `${(player.score / max) * 100}%` }}
             transition={{ duration: 0.8, delay: 0.1 + 0.06 * i }}

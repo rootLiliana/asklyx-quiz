@@ -14,12 +14,9 @@ export const inputClass = `
 
 export const primaryButtonClass = `
   w-full
-  bg-gradient-to-r
-  from-fuchsia-500
-  to-purple-600
-  hover:from-fuchsia-400
-  hover:to-purple-500
-  text-white
+  bg-pearl
+  hover:bg-fuchsia-300
+  text-fuchsia-950
   font-bold
   text-lg
   py-4

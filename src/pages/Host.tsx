@@ -260,7 +260,7 @@ export default function Host() {
         onClick={() => setTab(item)}
         aria-current={active ? "page" : undefined}
         className={`flex shrink-0 items-center gap-2.5 rounded-xl font-semibold transition ${compact ? "px-3.5 py-2 text-sm" : "w-full px-3 py-2.5 text-left"} ${
-          active ? "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white shadow-glow" : "text-slate-300 hover:bg-white/10 hover:text-white"
+          active ? "bg-pearl/15 text-fuchsia-100 ring-1 ring-pearl/40" : "text-slate-300 hover:bg-white/10 hover:text-white"
         }`}
       >
         <Icon name={TAB_META[item].icon} className="size-5 shrink-0" />

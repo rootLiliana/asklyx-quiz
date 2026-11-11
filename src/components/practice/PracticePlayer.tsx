@@ -12,7 +12,7 @@ import {
 import CodeBlock from "../material/CodeBlock";
 
 const textAreaClass = "w-full rounded-xl bg-white p-4 text-black focus:outline-none focus:ring-4 focus:ring-fuchsia-400";
-const primaryButton = "w-full rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 px-5 py-4 text-lg font-bold text-white hover:from-fuchsia-400 hover:to-purple-500 disabled:opacity-50";
+const primaryButton = "w-full rounded-xl bg-pearl px-5 py-4 text-lg font-bold text-fuchsia-950 hover:bg-fuchsia-300 disabled:opacity-50";
 
 type Phase = "intro" | "playing" | "done";
 
