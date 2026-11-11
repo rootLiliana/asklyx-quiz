@@ -11,6 +11,8 @@ const MAX_BLOCKS = 60;
 const MAX_TEXT = 20_000;
 const MAX_URL = 2_000;
 const MAX_LABEL = 200;
+// Un HTML interactivo pesa ~10-60 KB; 1 MB deja holgura para imágenes en línea.
+export const MAX_HTML = 1_000_000;
 
 function validateId(id: string, name: string): string {
   if (!/^\d+$/.test(id)) {
@@ -53,7 +55,14 @@ function validateBlock(raw: unknown, index: number): MaterialBlock {
     return { type: "link", url, label };
   }
 
-  throw new MaterialInputError(`${where}: type must be text, code or link`);
+  if (block.type === "html") {
+    if (typeof block.html !== "string" || !block.html.trim()) throw new MaterialInputError(`${where}: html is required`);
+    if (block.html.length > MAX_HTML) throw new MaterialInputError(`${where}: html file is too large (max 1 MB)`);
+    const fileName = typeof block.fileName === "string" ? block.fileName.trim().slice(0, MAX_LABEL) : "";
+    return { type: "html", html: block.html, fileName };
+  }
+
+  throw new MaterialInputError(`${where}: type must be text, code, link or html`);
 }
 
 export function validateMaterialInput(input: unknown): MaterialFields {

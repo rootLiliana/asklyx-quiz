@@ -8,10 +8,11 @@ import { percentageTextClass } from "../lib/percentage";
 import type { Material, StudentClassMaterials } from "../types/Material";
 import type { StudentPracticeSummary } from "../types/Practice";
 
-function Shell({ children, onBack, backLabel }: { children: ReactNode; onBack: () => void; backLabel: string }) {
+// `wide`: material interactivo (HTML), que necesita más ancho que una lectura.
+function Shell({ children, onBack, backLabel, wide = false }: { children: ReactNode; onBack: () => void; backLabel: string; wide?: boolean }) {
   return (
     <div className="min-h-dvh bg-gradient-to-br from-purple-900 via-indigo-900 to-black px-4 py-8 sm:p-8 flex justify-center">
-      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-3xl">
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className={`w-full ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
         <button onClick={onBack} className="text-white/60 text-sm mb-4 hover:text-white transition">← {backLabel}</button>
         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 sm:p-8 text-white shadow-2xl">{children}</div>
       </motion.div>
@@ -48,13 +49,13 @@ function MaterialReader({ materialId, onBack }: { materialId: string; onBack: ()
   }, [materialId, navigate]);
 
   return (
-    <Shell onBack={onBack} backLabel="Volver a mis clases">
+    <Shell onBack={onBack} backLabel="Volver a mis clases" wide={material?.blocks.some((block) => block.type === "html") ?? false}>
       {error && <p className="text-red-300">Este material ya no está disponible.</p>}
       {!material && !error && <p className="text-white/70">Cargando...</p>}
       {material && (
         <>
           <h1 className="text-2xl sm:text-3xl font-bold mb-6 break-words">{material.title}</h1>
-          <MaterialView blocks={material.blocks} />
+          <MaterialView blocks={material.blocks} title={material.title} />
         </>
       )}
     </Shell>

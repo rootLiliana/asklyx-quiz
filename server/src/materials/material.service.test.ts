@@ -4,7 +4,7 @@ import test from "node:test";
 import type { ClassRepository } from "../classes/class.repository.js";
 import type { ClassItem } from "../classes/class.types.js";
 import type { MaterialRepository } from "./material.repository.js";
-import { MaterialClassNotFoundError, MaterialInputError, MaterialNotFoundError, MaterialService, validateMaterialInput } from "./material.service.js";
+import { MaterialClassNotFoundError, MaterialInputError, MaterialNotFoundError, MaterialService, MAX_HTML, validateMaterialInput } from "./material.service.js";
 import type { Material, MaterialFields } from "./material.types.js";
 
 // "Sesión 3" la tienen los dos grupos: misma sesión (lesson "L3").
@@ -79,10 +79,19 @@ test("rejects links that are not http(s), empty blocks and unknown block types",
   assert.throws(() => validateMaterialInput(withBlock({ type: "link", url: "javascript:alert(1)" })), MaterialInputError);
   assert.throws(() => validateMaterialInput(withBlock({ type: "link", url: "no es url" })), MaterialInputError);
   assert.throws(() => validateMaterialInput(withBlock({ type: "text", text: "   " })), MaterialInputError);
-  assert.throws(() => validateMaterialInput(withBlock({ type: "html", html: "<script>" })), MaterialInputError);
+  assert.throws(() => validateMaterialInput(withBlock({ type: "video", url: "https://x.com" })), MaterialInputError);
   assert.throws(() => validateMaterialInput({ title: "x", blocks: [] }), MaterialInputError);
   assert.throws(() => validateMaterialInput({ title: "", blocks: [{ type: "text", text: "a" }] }), MaterialInputError);
   assert.throws(() => validateMaterialInput({ ...validInput(null), publishedAt: "mañana" }), MaterialInputError);
+});
+
+test("accepts an interactive html block and rejects empty or oversized html", () => {
+  const html = "<!doctype html><title>For paso a paso</title><script>console.log(1)</script>";
+  const fields = validateMaterialInput({ title: "For", blocks: [{ type: "html", html, fileName: "  for.html  " }] });
+  assert.deepEqual(fields.blocks, [{ type: "html", html, fileName: "for.html" }]);
+
+  assert.throws(() => validateMaterialInput({ title: "x", blocks: [{ type: "html", html: "   " }] }), MaterialInputError);
+  assert.throws(() => validateMaterialInput({ title: "x", blocks: [{ type: "html", html: "a".repeat(MAX_HTML + 1) }] }), MaterialInputError);
 });
 
 test("an unknown code language falls back to python", () => {

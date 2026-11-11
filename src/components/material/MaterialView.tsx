@@ -1,14 +1,16 @@
 import type { MaterialBlock } from "../../types/Material";
 import CodeBlock from "./CodeBlock";
+import HtmlFrame from "./HtmlFrame";
 import RichText from "./RichText";
 
 // Cómo se ve un material: igual en la vista previa del Host y para las alumnas.
-export default function MaterialView({ blocks }: { blocks: MaterialBlock[] }) {
+export default function MaterialView({ blocks, title }: { blocks: MaterialBlock[]; title?: string }) {
   return (
     <div className="space-y-5 text-white">
       {blocks.map((block, index) => {
         if (block.type === "text") return <RichText key={index} text={block.text} />;
         if (block.type === "code") return <CodeBlock key={index} code={block.code} language={block.language} />;
+        if (block.type === "html") return <HtmlFrame key={index} html={block.html} title={title || block.fileName || "Material interactivo"} />;
         return (
           <a
             key={index}

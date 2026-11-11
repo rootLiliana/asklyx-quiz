@@ -183,7 +183,8 @@ app.listen(PORT, () => {
 app.use(cors({
     origin: "*"
   }));
-app.use(express.json());
+// 3 MB: el material puede traer páginas HTML interactivas (hasta 1 MB cada una).
+app.use(express.json({ limit: "3mb" }));
 
 app.get("/health", (_, res) => {
   res.json({
